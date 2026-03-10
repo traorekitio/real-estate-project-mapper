@@ -1,8 +1,8 @@
-import React from "react";
-import { StyleSheet, Dimensions, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { supabase } from "../../lib/supabase";
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native"; // <-- import
 
 type Project = {
   id: string;
@@ -14,26 +14,28 @@ type Project = {
 export default function MapScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
 
-  // Fetch projects from Supabase
-  useEffect(() => {
-    const fetchProjects = async () => {
-      let { data, error } = await supabase.from("projects").select("*");
-      if (error) {
-        console.log("Error fetching projects:", error);
-      } else {
-        setProjects(data as Project[]);
-      }
-    };
+  // Fetch projects depuis Supabase chaque fois que l'écran est focus
+  const fetchProjects = async () => {
+    const { data, error } = await supabase.from("projects").select("*");
+    if (error) {
+      console.log("Error fetching projects:", error);
+    } else {
+      setProjects(data as Project[]);
+    }
+  };
 
-    fetchProjects();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchProjects();
+    }, [])
+  );
 
   return (
     <View style={styles.container}>
       <MapView
         style={styles.map}
         initialRegion={{
-          latitude: 33.5731, // Casablanca centre
+          latitude: 33.5731,
           longitude: -7.5898,
           latitudeDelta: 0.1,
           longitudeDelta: 0.1,
@@ -55,11 +57,6 @@ export default function MapScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    width: Dimensions.get("window").width,
-    height: Dimensions.get("window").height,
-  },
+  container: { flex: 1 },
+  map: { flex: 1 },
 });
