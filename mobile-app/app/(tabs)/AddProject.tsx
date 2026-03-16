@@ -30,7 +30,6 @@ const projectTypes = [
   "Retail",
 ];
 
-// Typologies par type de projet
 const typologiesOptions = {
   Collectif: ["F2", "F3", "F4", "F5"],
   Villa: ["Villa Jumelee", "Villa Indivuelle", "Villa en Bande"],
@@ -40,26 +39,29 @@ const typologiesOptions = {
 export default function AddProjectScreen() {
   const router = useRouter();
 
-  // --- Popup type projet ---
   const [showTypeModal, setShowTypeModal] = useState(true);
   const [projectType, setProjectType] = useState("");
 
-  // --- Champs communs ---
+  // --- Infos globales projet ---
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [quartier, setQuartier] = useState("");
   const [developer, setDeveloper] = useState("");
   const [status, setStatus] = useState("");
+
+  const [surfaceFonciere, setSurfaceFonciere] = useState("");
+  const [totalUnits, setTotalUnits] = useState("");
+
   const [deliveryDate, setDeliveryDate] = useState("");
   const [startCommercialDate, setStartCommercialDate] = useState("");
   const [commercializationRate, setCommercializationRate] = useState("");
   const [salesVelocity, setSalesVelocity] = useState("");
   const [unitsRemaining, setUnitsRemaining] = useState("");
 
-  // --- Typologies multiples ---
+  // --- Typologies ---
   const [currentTypology, setCurrentTypology] = useState("");
   const [surfaceHabitable, setSurfaceHabitable] = useState("");
-  const [surfaceTotale, setSurfaceTotale] = useState("");
+  const [surfaceTerrasse, setSurfaceTerrasse] = useState("");
   const [surfaceTerrain, setSurfaceTerrain] = useState("");
   const [pricing, setPricing] = useState("");
   const [units, setUnits] = useState("");
@@ -79,18 +81,38 @@ export default function AddProjectScreen() {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
-  // --- Reset popup à chaque focus de l'écran ---
   useFocusEffect(
     useCallback(() => {
       setShowTypeModal(true);
       setProjectType("");
       setTypologiesList([]);
+      setDensity("");
+      setCus("");
     }, [])
   );
 
   const selectType = (type: string) => {
     setProjectType(type);
     setShowTypeModal(false);
+    // Réinitialiser les densités quand on change le type
+    setDensity("");
+    setCus("");
+  };
+
+  // Fonction pour déterminer les champs de densité requis
+  const getDensityFields = () => {
+    const baseType = projectType.split("/")[0]; // Prendre le premier type en cas de types multiples
+    
+    if (baseType === "Collectif") {
+      return { hasDensity: true, label: "Densité/immeuble", hasCus: false };
+    }
+    if (baseType === "Villa") {
+      return { hasDensity: true, label: "Densité/ha", hasCus: false };
+    }
+    if (baseType === "Lot de villas") {
+      return { hasDensity: true, label: "Densité/ha", hasCus: true };
+    }
+    return { hasDensity: false, label: "", hasCus: false };
   };
 
   const addCurrentTypology = () => {
@@ -104,17 +126,16 @@ export default function AddProjectScreen() {
       {
         typology: currentTypology,
         surfaceHabitable,
-        surfaceTotale,
+        surfaceTerrasse,
         surfaceTerrain,
         pricing,
         units,
       },
     ]);
 
-    // Reset formulaire typologie
     setCurrentTypology("");
     setSurfaceHabitable("");
-    setSurfaceTotale("");
+    setSurfaceTerrasse("");
     setSurfaceTerrain("");
     setPricing("");
     setUnits("");
@@ -138,6 +159,8 @@ export default function AddProjectScreen() {
           developer,
           project_type: projectType,
           status,
+          surface_fonciere: parseFloat(surfaceFonciere) || null,
+          total_units: parseInt(totalUnits) || null,
           delivery_date: deliveryDate || null,
           start_commercial_date: startCommercialDate || null,
           commercialization_rate: parseFloat(commercializationRate) || null,
@@ -154,14 +177,13 @@ export default function AddProjectScreen() {
 
     const projectId = data[0].id;
 
-    // --- Ajouter toutes les typologies ---
     for (let t of typologiesList) {
       await supabase.from("projects_typologies").insert([
         {
           project_id: projectId,
           typology: t.typology,
           surface_habitable: parseFloat(t.surfaceHabitable) || null,
-          surface_totale: parseFloat(t.surfaceTotale) || null,
+          surface_terrasse: parseFloat(t.surfaceTerrasse) || null,
           surface_terrain: parseFloat(t.surfaceTerrain) || null,
           pricing: t.pricing,
           units: parseInt(t.units) || null,
@@ -169,7 +191,6 @@ export default function AddProjectScreen() {
       ]);
     }
 
-    // --- Densité ---
     if (density) {
       await supabase.from("projects_density").insert([
         {
@@ -190,7 +211,6 @@ export default function AddProjectScreen() {
       ]);
     }
 
-    // --- Retail ---
     if (projectType === "Retail") {
       await supabase.from("projects_retail").insert([
         {
@@ -209,7 +229,6 @@ export default function AddProjectScreen() {
 
   return (
     <>
-      {/* POPUP TYPE PROJET */}
       <Modal visible={showTypeModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
@@ -227,7 +246,6 @@ export default function AddProjectScreen() {
         </View>
       </Modal>
 
-      {/* FORMULAIRE */}
       {!showTypeModal && (
         <ScrollView contentContainerStyle={styles.container}>
           <ThemedText type="title">Ajouter un projet</ThemedText>
@@ -238,27 +256,45 @@ export default function AddProjectScreen() {
           <TextInput placeholder="Ville" style={styles.input} onChangeText={setCity} />
           <TextInput placeholder="Quartier" style={styles.input} onChangeText={setQuartier} />
           <TextInput placeholder="Développeur" style={styles.input} onChangeText={setDeveloper} />
+
+          <TextInput
+            placeholder="Surface foncière (m²)"
+            style={styles.input}
+            onChangeText={setSurfaceFonciere}
+          />
+
+          <TextInput
+            placeholder="Nombre total d'unités"
+            style={styles.input}
+            onChangeText={setTotalUnits}
+          />
+
           <TextInput placeholder="Statut" style={styles.input} onChangeText={setStatus} />
+
           <TextInput
             placeholder="Date livraison (YYYY-MM-DD)"
             style={styles.input}
             onChangeText={setDeliveryDate}
           />
+
           <TextInput
             placeholder="Début commercialisation"
             style={styles.input}
             onChangeText={setStartCommercialDate}
           />
+
           <TextInput
             placeholder="Taux commercialisation %"
             style={styles.input}
             onChangeText={setCommercializationRate}
           />
+
           <TextInput
             placeholder="Taux écoulement"
             style={styles.input}
             onChangeText={setSalesVelocity}
           />
+
           <TextInput
             placeholder="Unités restantes"
             style={styles.input}
@@ -267,28 +303,31 @@ export default function AddProjectScreen() {
 
           {projectType !== "Retail" && (
             <>
-              <ThemedText style={{ marginTop: 10, fontWeight: "bold" }}>Ajouter une typologie</ThemedText>
+              <ThemedText style={{ marginTop: 10, fontWeight: "bold" }}>
+                Ajouter une typologie
+              </ThemedText>
 
               <View style={{ marginBottom: 10 }}>
                 <Text>Typologie</Text>
+
                 <ScrollView horizontal>
-                  {(
-                    typologiesOptions[projectType as keyof typeof typologiesOptions] || []
-                  ).map((t) => (
-                    <TouchableOpacity
-                      key={t}
-                      style={{
-                        padding: 8,
-                        margin: 4,
-                        borderWidth: 1,
-                        borderColor: currentTypology === t ? "blue" : "#ccc",
-                        borderRadius: 6,
-                      }}
-                      onPress={() => setCurrentTypology(t)}
-                    >
-                      <Text>{t}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  {(typologiesOptions[projectType as keyof typeof typologiesOptions] || []).map(
+                    (t) => (
+                      <TouchableOpacity
+                        key={t}
+                        style={{
+                          padding: 8,
+                          margin: 4,
+                          borderWidth: 1,
+                          borderColor: currentTypology === t ? "blue" : "#ccc",
+                          borderRadius: 6,
+                        }}
+                        onPress={() => setCurrentTypology(t)}
+                      >
+                        <Text>{t}</Text>
+                      </TouchableOpacity>
+                    )
+                  )}
                 </ScrollView>
 
                 <TextInput
@@ -297,24 +336,28 @@ export default function AddProjectScreen() {
                   value={surfaceHabitable}
                   onChangeText={setSurfaceHabitable}
                 />
+
                 <TextInput
-                  placeholder="Surface totale"
+                  placeholder="Surface terrasse"
                   style={styles.input}
-                  value={surfaceTotale}
-                  onChangeText={setSurfaceTotale}
+                  value={surfaceTerrasse}
+                  onChangeText={setSurfaceTerrasse}
                 />
+
                 <TextInput
                   placeholder="Surface terrain"
                   style={styles.input}
                   value={surfaceTerrain}
                   onChangeText={setSurfaceTerrain}
                 />
+
                 <TextInput
                   placeholder="Prix"
                   style={styles.input}
                   value={pricing}
                   onChangeText={setPricing}
                 />
+
                 <TextInput
                   placeholder="Nombre unités"
                   style={styles.input}
@@ -328,9 +371,12 @@ export default function AddProjectScreen() {
               {typologiesList.length > 0 && (
                 <View style={{ marginTop: 10 }}>
                   <Text>Typologies ajoutées :</Text>
+
                   {typologiesList.map((t, idx) => (
                     <Text key={idx}>
-                      {t.typology} - Surface hab: {t.surfaceHabitable} m² - Totale: {t.surfaceTotale} m² - Terrain: {t.surfaceTerrain} m² - Prix: {t.pricing} - Units: {t.units}
+                      {t.typology} - Habitable: {t.surfaceHabitable} m² - Terrasse:{" "}
+                      {t.surfaceTerrasse} m² - Terrain: {t.surfaceTerrain} m² - Prix: {t.pricing} -
+                      Units: {t.units}
                     </Text>
                   ))}
                 </View>
@@ -341,11 +387,53 @@ export default function AddProjectScreen() {
           {projectType === "Retail" && (
             <>
               <TextInput placeholder="GLA" style={styles.input} onChangeText={setGla} />
-              <TextInput placeholder="Positionnement" style={styles.input} onChangeText={setPositionnement} />
-              <TextInput placeholder="Mix retail" style={styles.input} onChangeText={setMixRetail} />
-              <TextInput placeholder="Enseignes" style={styles.input} onChangeText={setEnseignes} />
+              <TextInput
+                placeholder="Positionnement"
+                style={styles.input}
+                onChangeText={setPositionnement}
+              />
+              <TextInput
+                placeholder="Mix retail"
+                style={styles.input}
+                onChangeText={setMixRetail}
+              />
+              <TextInput
+                placeholder="Enseignes"
+                style={styles.input}
+                onChangeText={setEnseignes}
+              />
             </>
           )}
+
+          {/* Densité - affichée selon le type de projet */}
+          {(() => {
+            const densityFields = getDensityFields();
+            return densityFields.hasDensity ? (
+              <View style={{ marginTop: 20, marginBottom: 20 }}>
+                <ThemedText style={{ fontSize: 16, fontWeight: "bold", marginBottom: 10 }}>
+                  Densité
+                </ThemedText>
+
+                <TextInput
+                  placeholder={densityFields.label}
+                  style={styles.input}
+                  value={density}
+                  onChangeText={setDensity}
+                  keyboardType="decimal-pad"
+                />
+
+                {densityFields.hasCus && (
+                  <TextInput
+                    placeholder="CUS"
+                    style={styles.input}
+                    value={cus}
+                    onChangeText={setCus}
+                    keyboardType="decimal-pad"
+                  />
+                )}
+              </View>
+            ) : null;
+          })()}
 
           <ThemedText style={styles.locationTitle}>Localisation</ThemedText>
           <ThemedText style={styles.locationSubtitle}>Situez le projet sur la carte</ThemedText>
