@@ -18,6 +18,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 
 import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
+import { AppColors } from "@/constants/colors";
 
 const projectTypes = [
   "Collectif",
@@ -234,14 +235,14 @@ export default function AddProjectScreen() {
       <Modal visible={showTypeModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <ThemedText type="title">Choisissez le type de projet</ThemedText>
+            <Text style={styles.modalTitle}>Choisissez le type de projet</Text>
             {projectTypes.map((type) => (
               <TouchableOpacity
                 key={type}
                 style={styles.typeButton}
                 onPress={() => selectType(type)}
               >
-                <ThemedText>{type}</ThemedText>
+                <Text style={styles.typeButtonText}>{type}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -250,9 +251,9 @@ export default function AddProjectScreen() {
 
       {!showTypeModal && (
         <ScrollView contentContainerStyle={styles.container}>
-          <ThemedText type="title">Ajouter un projet</ThemedText>
+          <Text style={styles.mainTitle}>Ajouter un projet</Text>
 
-          <ThemedText style={styles.projectType}>Type : {projectType}</ThemedText>
+          <Text style={styles.projectType}>Type : <Text style={{ fontWeight: "700", color: AppColors.accent }}>{projectType}</Text></Text>
 
           <TextInput placeholder="Nom du projet" style={styles.input} onChangeText={setName} />
           <TextInput placeholder="Ville" style={styles.input} onChangeText={setCity} />
@@ -505,7 +506,15 @@ export default function AddProjectScreen() {
             {latitude && longitude && <Marker coordinate={{ latitude, longitude }} />}
           </MapView>
 
-          <Button title="Ajouter projet" onPress={addProject} />
+          <TouchableOpacity 
+            style={styles.submitButton}
+            onPress={addProject}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.submitButtonText}>✓ Ajouter projet</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 20 }} />
         </ScrollView>
       )}
     </>
@@ -513,87 +522,158 @@ export default function AddProjectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16 },
+  container: { 
+    padding: 18,
+    backgroundColor: AppColors.gray.lightest,
+  },
+
+  mainTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginBottom: 8,
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
+  },
 
   input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 6,
-    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: AppColors.gray.lighter,
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 12,
+    backgroundColor: AppColors.ui.background,
+    color: AppColors.ui.text,
+    fontSize: 16,
+    fontWeight: "500",
+    fontFamily: "Century Gothic",
   },
 
   projectType: {
-    marginBottom: 20,
-    fontSize: 16,
+    marginBottom: 22,
+    fontSize: 18,
+    fontWeight: "700",
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
   },
 
   locationTitle: {
-    marginTop: 20,
-    fontSize: 18,
+    marginTop: 24,
+    fontSize: 20,
+    fontWeight: "700",
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
   },
 
   locationSubtitle: {
-    marginBottom: 10,
+    marginBottom: 14,
     opacity: 0.7,
+    fontSize: 14,
+    color: AppColors.gray.dark,
+    fontFamily: "Century Gothic",
   },
 
   map: {
     width: "100%",
     height: Dimensions.get("window").height * 0.4,
     marginBottom: 20,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: AppColors.primary.light,
   },
 
   mapTypeContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
-    marginBottom: 10,
+    marginBottom: 16,
     gap: 8,
   },
 
   mapTypeButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    backgroundColor: "#f5f5f5",
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: AppColors.gray.lighter,
+    backgroundColor: AppColors.ui.background,
     alignItems: "center",
   },
 
   mapTypeButtonActive: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
+    backgroundColor: AppColors.primary.light,
+    borderColor: AppColors.primary.light,
   },
 
   mapTypeButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
+    fontSize: 13,
+    fontWeight: "700",
+    color: AppColors.ui.text,
   },
 
   mapTypeButtonTextActive: {
-    color: "white",
+    color: AppColors.ui.background,
   },
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(49, 132, 155, 0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
 
   modalBox: {
-    backgroundColor: "white",
-    padding: 20,
-    borderRadius: 12,
-    width: "85%",
+    backgroundColor: AppColors.ui.background,
+    padding: 24,
+    borderRadius: 16,
+    width: "88%",
+    borderWidth: 2,
+    borderColor: AppColors.primary.light,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 16,
+    color: AppColors.primary.main,
+    textAlign: "center",
+    fontFamily: "Century Gothic",
   },
 
   typeButton: {
-    padding: 12,
+    padding: 14,
     borderBottomWidth: 1,
-    borderColor: "#eee",
+    borderColor: AppColors.gray.lightest,
+    backgroundColor: AppColors.ui.background,
+  },
+
+  typeButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
+  },
+
+  submitButton: {
+    backgroundColor: AppColors.primary.light,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 20,
+    alignItems: "center",
+    marginTop: 8,
+    shadowColor: AppColors.primary.main,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+
+  submitButtonText: {
+    color: AppColors.ui.background,
+    fontSize: 18,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    fontFamily: "Century Gothic",
   },
 });
