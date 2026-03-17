@@ -11,7 +11,11 @@ type Project = {
   longitude: number;
 };
 
-export default function MapScreen() {
+type MapViewProps = {
+  mapType?: "standard" | "satellite" | "hybrid" | "terrain";
+};
+
+export default function MapScreen({ mapType = "standard" }: MapViewProps) {
   const [projects, setProjects] = useState<Project[]>([]);
 
   // Fetch projects depuis Supabase chaque fois que l'écran est focus
@@ -34,6 +38,7 @@ export default function MapScreen() {
     <View style={styles.container}>
       <MapView
         style={styles.map}
+        mapType={mapType}
         initialRegion={{
           latitude: 33.5731,
           longitude: -7.5898,

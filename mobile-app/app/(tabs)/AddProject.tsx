@@ -41,6 +41,7 @@ export default function AddProjectScreen() {
 
   const [showTypeModal, setShowTypeModal] = useState(true);
   const [projectType, setProjectType] = useState("");
+  const [mapType, setMapType] = useState<"standard" | "satellite" | "terrain">("standard");
 
   // --- Infos globales projet ---
   const [name, setName] = useState("");
@@ -88,6 +89,7 @@ export default function AddProjectScreen() {
       setTypologiesList([]);
       setDensity("");
       setCus("");
+      setMapType("standard");
     }, [])
   );
 
@@ -104,13 +106,13 @@ export default function AddProjectScreen() {
     const baseType = projectType.split("/")[0]; // Prendre le premier type en cas de types multiples
     
     if (baseType === "Collectif") {
-      return { hasDensity: true, label: "Densité/immeuble", hasCus: false };
+      return { hasDensity: true, label: "Densité/immeuble (unité/immeuble)", hasCus: false };
     }
     if (baseType === "Villa") {
-      return { hasDensity: true, label: "Densité/ha", hasCus: false };
+      return { hasDensity: true, label: "Densité/ha (unité/ha)", hasCus: false };
     }
     if (baseType === "Lot de villas") {
-      return { hasDensity: true, label: "Densité/ha", hasCus: true };
+      return { hasDensity: true, label: "Densité/ha (unité/ha)", hasCus: true };
     }
     return { hasDensity: false, label: "", hasCus: false };
   };
@@ -290,7 +292,7 @@ export default function AddProjectScreen() {
           />
 
           <TextInput
-            placeholder="Taux écoulement"
+            placeholder="Taux écoulement(unité/mois)"
             style={styles.input}
             onChangeText={setSalesVelocity}
           />
@@ -331,28 +333,28 @@ export default function AddProjectScreen() {
                 </ScrollView>
 
                 <TextInput
-                  placeholder="Surface habitable"
+                  placeholder="Surface habitable (m²)"
                   style={styles.input}
                   value={surfaceHabitable}
                   onChangeText={setSurfaceHabitable}
                 />
 
                 <TextInput
-                  placeholder="Surface terrasse"
+                  placeholder="Surface terrasse (m²)"
                   style={styles.input}
                   value={surfaceTerrasse}
                   onChangeText={setSurfaceTerrasse}
                 />
 
                 <TextInput
-                  placeholder="Surface terrain"
+                  placeholder="Surface terrain (m²)"
                   style={styles.input}
                   value={surfaceTerrain}
                   onChangeText={setSurfaceTerrain}
                 />
 
                 <TextInput
-                  placeholder="Prix"
+                  placeholder="Prix de vente (MAD)"
                   style={styles.input}
                   value={pricing}
                   onChangeText={setPricing}
@@ -438,8 +440,57 @@ export default function AddProjectScreen() {
           <ThemedText style={styles.locationTitle}>Localisation</ThemedText>
           <ThemedText style={styles.locationSubtitle}>Situez le projet sur la carte</ThemedText>
 
+          {/* Boutons pour changer le type de carte */}
+          <View style={styles.mapTypeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.mapTypeButton,
+                mapType === "standard" && styles.mapTypeButtonActive,
+              ]}
+              onPress={() => setMapType("standard")}
+            >
+              <Text style={[
+                styles.mapTypeButtonText,
+                mapType === "standard" && styles.mapTypeButtonTextActive,
+              ]}>
+                Standard
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.mapTypeButton,
+                mapType === "satellite" && styles.mapTypeButtonActive,
+              ]}
+              onPress={() => setMapType("satellite")}
+            >
+              <Text style={[
+                styles.mapTypeButtonText,
+                mapType === "satellite" && styles.mapTypeButtonTextActive,
+              ]}>
+                Satellite
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.mapTypeButton,
+                mapType === "terrain" && styles.mapTypeButtonActive,
+              ]}
+              onPress={() => setMapType("terrain")}
+            >
+              <Text style={[
+                styles.mapTypeButtonText,
+                mapType === "terrain" && styles.mapTypeButtonTextActive,
+              ]}>
+                Relief
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           <MapView
             style={styles.map}
+            mapType={mapType}
             initialRegion={{
               latitude: 33.5731,
               longitude: -7.5898,
@@ -491,6 +542,39 @@ const styles = StyleSheet.create({
     width: "100%",
     height: Dimensions.get("window").height * 0.4,
     marginBottom: 20,
+  },
+
+  mapTypeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginBottom: 10,
+    gap: 8,
+  },
+
+  mapTypeButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "#f5f5f5",
+    alignItems: "center",
+  },
+
+  mapTypeButtonActive: {
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
+  },
+
+  mapTypeButtonText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#333",
+  },
+
+  mapTypeButtonTextActive: {
+    color: "white",
   },
 
   modalOverlay: {
