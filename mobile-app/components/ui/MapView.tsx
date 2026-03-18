@@ -15,13 +15,34 @@ type Project = {
   city?: string;
   quartier?: string;
   developer?: string;
-  surface_fonciere?: number;
+  // Surfaces foncières séparées par type
+  surface_fonciere_totale?: number;
+  surface_fonciere_collectif?: number;
+  surface_fonciere_villa?: number;
+  surface_fonciere_lot_villas?: number;
+  // Total d'unités séparées par type
   total_units?: number;
+  total_units_collectif?: number;
+  total_units_villa?: number;
+  total_units_lot_villas?: number;
+  // Taux de commercialisation par type
+  commercialization_rate_global?: number;
+  commercialization_rate_collectif?: number;
+  commercialization_rate_villa?: number;
+  commercialization_rate_lot_villas?: number;
+  // Taux d'écoulement par type
+  sales_velocity_global?: number;
+  sales_velocity_collectif?: number;
+  sales_velocity_villa?: number;
+  sales_velocity_lot_villas?: number;
+  // Unités restantes par type
+  units_remaining_global?: number;
+  units_remaining_collectif?: number;
+  units_remaining_villa?: number;
+  units_remaining_lot_villas?: number;
+  // Dates
   delivery_date?: string;
   start_commercial_date?: string;
-  commercialization_rate?: number;
-  sales_velocity?: number;
-  units_remaining?: number;
 };
 
 type Typology = {
@@ -220,6 +241,8 @@ export default function MapScreen({
               }}
               title={project.name}
               onPress={() => handleMarkerPress(project)}
+              anchor={{ x: 0.5, y: 0.5 }}
+              centerOffset={{ x: 0, y: 0 }}
             >
               {isSatelliteMode ? (
                 // Mode Satellite/Hybrid : bulle numérotée (centrée, sans flèche)
@@ -295,15 +318,31 @@ export default function MapScreen({
 
                   {/* === DONNÉES PHYSIQUES === */}
 
-                  {/* Surface foncière */}
-                  {selectedProject.surface_fonciere && (
+                  {/* Surface foncière totale */}
+                  {selectedProject.surface_fonciere_totale && (
                     <View style={styles.detailsSection}>
-                      <Text style={styles.detailsLabel}>Surface foncière</Text>
-                      <Text style={styles.detailsValue}>{selectedProject.surface_fonciere.toLocaleString()} m²</Text>
+                      <Text style={styles.detailsLabel}>Surface foncière totale</Text>
+                      <Text style={styles.detailsValue}>{selectedProject.surface_fonciere_totale.toLocaleString()} m²</Text>
                     </View>
                   )}
 
-                  {/* Total d'unités */}
+                  {/* Surfaces foncières par type */}
+                  {(selectedProject.surface_fonciere_collectif || selectedProject.surface_fonciere_villa || selectedProject.surface_fonciere_lot_villas) && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Surfaces foncières par type</Text>
+                      {selectedProject.surface_fonciere_collectif && (
+                        <Text style={styles.detailsValue}>• Collectif: {selectedProject.surface_fonciere_collectif.toLocaleString()} m²</Text>
+                      )}
+                      {selectedProject.surface_fonciere_villa && (
+                        <Text style={styles.detailsValue}>• Villa: {selectedProject.surface_fonciere_villa.toLocaleString()} m²</Text>
+                      )}
+                      {selectedProject.surface_fonciere_lot_villas && (
+                        <Text style={styles.detailsValue}>• Lot de villas: {selectedProject.surface_fonciere_lot_villas.toLocaleString()} m²</Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Total d'unités global */}
                   {selectedProject.total_units && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Nombre total d'unités</Text>
@@ -311,11 +350,43 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Unités restantes */}
-                  {selectedProject.units_remaining && (
+                  {/* Total d'unités par type */}
+                  {(selectedProject.total_units_collectif || selectedProject.total_units_villa || selectedProject.total_units_lot_villas) && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Total d'unités par type</Text>
+                      {selectedProject.total_units_collectif && (
+                        <Text style={styles.detailsValue}>• Collectif: {selectedProject.total_units_collectif} unités</Text>
+                      )}
+                      {selectedProject.total_units_villa && (
+                        <Text style={styles.detailsValue}>• Villa: {selectedProject.total_units_villa} unités</Text>
+                      )}
+                      {selectedProject.total_units_lot_villas && (
+                        <Text style={styles.detailsValue}>• Lot de villas: {selectedProject.total_units_lot_villas} unités</Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Unités restantes global */}
+                  {selectedProject.units_remaining_global && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Unités restantes</Text>
-                      <Text style={styles.detailsValue}>{selectedProject.units_remaining} unités</Text>
+                      <Text style={styles.detailsValue}>{selectedProject.units_remaining_global} unités</Text>
+                    </View>
+                  )}
+
+                  {/* Unités restantes par type */}
+                  {(selectedProject.units_remaining_collectif || selectedProject.units_remaining_villa || selectedProject.units_remaining_lot_villas) && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Unités restantes par type</Text>
+                      {selectedProject.units_remaining_collectif && (
+                        <Text style={styles.detailsValue}>• Collectif: {selectedProject.units_remaining_collectif} unités</Text>
+                      )}
+                      {selectedProject.units_remaining_villa && (
+                        <Text style={styles.detailsValue}>• Villa: {selectedProject.units_remaining_villa} unités</Text>
+                      )}
+                      {selectedProject.units_remaining_lot_villas && (
+                        <Text style={styles.detailsValue}>• Lot de villas: {selectedProject.units_remaining_lot_villas} unités</Text>
+                      )}
                     </View>
                   )}
 
@@ -337,19 +408,51 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Taux de commercialisation */}
-                  {selectedProject.commercialization_rate && (
+                  {/* Taux de commercialisation global */}
+                  {selectedProject.commercialization_rate_global && (
                     <View style={styles.detailsSection}>
-                      <Text style={styles.detailsLabel}>Taux de commercialisation</Text>
-                      <Text style={styles.detailsValue}>{selectedProject.commercialization_rate}%</Text>
+                      <Text style={styles.detailsLabel}>Taux de commercialisation global</Text>
+                      <Text style={styles.detailsValue}>{selectedProject.commercialization_rate_global}%</Text>
                     </View>
                   )}
 
-                  {/* Taux d'écoulement */}
-                  {selectedProject.sales_velocity && (
+                  {/* Taux de commercialisation par type */}
+                  {(selectedProject.commercialization_rate_collectif || selectedProject.commercialization_rate_villa || selectedProject.commercialization_rate_lot_villas) && (
                     <View style={styles.detailsSection}>
-                      <Text style={styles.detailsLabel}>Taux d'écoulement</Text>
-                      <Text style={styles.detailsValue}>{selectedProject.sales_velocity} unités/mois</Text>
+                      <Text style={styles.detailsLabel}>Taux de commercialisation par type</Text>
+                      {selectedProject.commercialization_rate_collectif && (
+                        <Text style={styles.detailsValue}>• Collectif: {selectedProject.commercialization_rate_collectif}%</Text>
+                      )}
+                      {selectedProject.commercialization_rate_villa && (
+                        <Text style={styles.detailsValue}>• Villa: {selectedProject.commercialization_rate_villa}%</Text>
+                      )}
+                      {selectedProject.commercialization_rate_lot_villas && (
+                        <Text style={styles.detailsValue}>• Lot de villas: {selectedProject.commercialization_rate_lot_villas}%</Text>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Taux d'écoulement global */}
+                  {selectedProject.sales_velocity_global && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Taux d'écoulement global</Text>
+                      <Text style={styles.detailsValue}>{selectedProject.sales_velocity_global} unités/mois</Text>
+                    </View>
+                  )}
+
+                  {/* Taux d'écoulement par type */}
+                  {(selectedProject.sales_velocity_collectif || selectedProject.sales_velocity_villa || selectedProject.sales_velocity_lot_villas) && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Taux d'écoulement par type</Text>
+                      {selectedProject.sales_velocity_collectif && (
+                        <Text style={styles.detailsValue}>• Collectif: {selectedProject.sales_velocity_collectif} unités/mois</Text>
+                      )}
+                      {selectedProject.sales_velocity_villa && (
+                        <Text style={styles.detailsValue}>• Villa: {selectedProject.sales_velocity_villa} unités/mois</Text>
+                      )}
+                      {selectedProject.sales_velocity_lot_villas && (
+                        <Text style={styles.detailsValue}>• Lot de villas: {selectedProject.sales_velocity_lot_villas} unités/mois</Text>
+                      )}
                     </View>
                   )}
 

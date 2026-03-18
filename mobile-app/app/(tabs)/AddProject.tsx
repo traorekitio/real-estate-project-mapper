@@ -20,27 +20,64 @@ import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
 import { AppColors } from "@/constants/colors";
 
-const projectTypes = [
-  "Collectif",
-  "Villa",
-  "Lot de villas",
+const projectMainTypes = ["Collectif", "Villa", "Lot de villas", "Retail", "Mixte"];
+
+const projectMixedTypes = [
   "Collectif/Villa",
   "Collectif/Lot de villas",
   "Villa/Lot de villas",
   "Collectif/Villa/Lot de villas",
-  "Retail",
 ];
 
 const typologiesOptions = {
-  Collectif: ["F2", "F3", "F4", "F5"],
-  Villa: ["Villa Jumelee", "Villa Indivuelle", "Villa en Bande"],
-  "Lot de villas": ["Villa Jumelee", "Villa Indivuelle", "Villa en Bande"],
+  Collectif: ["F2", "F3", "F4", "F5", "F6"],
+  Villa: ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
+  "Lot de villas": ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
+};
+
+// Fonction de conversion de surfaces
+const convertSurface = (value: string, fromUnit: string, toUnit: string): string => {
+  if (!value || isNaN(parseFloat(value))) return "";
+  
+  const numValue = parseFloat(value);
+  let m2Value = numValue;
+
+  // Convertir vers m² d'abord
+  if (fromUnit === "ha") {
+    m2Value = numValue * 10000;
+  }
+
+  // Convertir de m² vers l'unité cible
+  let result = m2Value;
+  if (toUnit === "ha") {
+    result = m2Value / 10000;
+  }
+
+  return result.toFixed(2);
+};
+
+// Fonction pour basculer l'unité et convertir la valeur
+const toggleSurfaceUnit = (
+  currentValue: string,
+  currentUnit: "m²" | "ha",
+  setValue: (value: string) => void,
+  setUnit: (unit: "m²" | "ha") => void
+) => {
+  if (!currentValue || isNaN(parseFloat(currentValue))) {
+    return;
+  }
+
+  const newUnit = currentUnit === "m²" ? "ha" : "m²";
+  const convertedValue = convertSurface(currentValue, currentUnit, newUnit);
+  setValue(convertedValue);
+  setUnit(newUnit);
 };
 
 export default function AddProjectScreen() {
   const router = useRouter();
 
-  const [showTypeModal, setShowTypeModal] = useState(true);
+  const [showMainTypeModal, setShowMainTypeModal] = useState(true);
+  const [showMixedTypeModal, setShowMixedTypeModal] = useState(false);
   const [projectType, setProjectType] = useState("");
   const [mapType, setMapType] = useState<"standard" | "satellite" | "terrain">("standard");
 
@@ -51,17 +88,43 @@ export default function AddProjectScreen() {
   const [developer, setDeveloper] = useState("");
   const [status, setStatus] = useState("");
 
-  const [surfaceFonciere, setSurfaceFonciere] = useState("");
-  const [totalUnits, setTotalUnits] = useState("");
+  // --- Surfaces Foncières ---
+  const [surfaceFonciereTotal, setSurfaceFonciereTotal] = useState("");
+  const [surfaceFonciereCollectif, setSurfaceFonciereCollectif] = useState("");
+  const [surfaceFonciereVilla, setSurfaceFonciereVilla] = useState("");
+  const [surfaceFonciereVillaLot, setSurfaceFonciereVillaLot] = useState("");
 
+  // --- Total Units ---
+  const [totalUnitsGlobal, setTotalUnitsGlobal] = useState("");
+  const [totalUnitsCollectif, setTotalUnitsCollectif] = useState("");
+  const [totalUnitsVilla, setTotalUnitsVilla] = useState("");
+  const [totalUnitsVillaLot, setTotalUnitsVillaLot] = useState("");
+
+  // --- Dates ---
   const [deliveryDate, setDeliveryDate] = useState("");
   const [startCommercialDate, setStartCommercialDate] = useState("");
-  const [commercializationRate, setCommercializationRate] = useState("");
-  const [salesVelocity, setSalesVelocity] = useState("");
-  const [unitsRemaining, setUnitsRemaining] = useState("");
+
+  // --- Commercialisation ---
+  const [commercializationRateGlobal, setCommercializationRateGlobal] = useState("");
+  const [commercializationRateCollectif, setCommercializationRateCollectif] = useState("");
+  const [commercializationRateVilla, setCommercializationRateVilla] = useState("");
+  const [commercializationRateVillaLot, setCommercializationRateVillaLot] = useState("");
+
+  // --- Taux d'écoulement ---
+  const [salesVelocityGlobal, setSalesVelocityGlobal] = useState("");
+  const [salesVelocityCollectif, setSalesVelocityCollectif] = useState("");
+  const [salesVelocityVilla, setSalesVelocityVilla] = useState("");
+  const [salesVelocityVillaLot, setSalesVelocityVillaLot] = useState("");
+
+  // --- Unités restantes ---
+  const [unitsRemainingGlobal, setUnitsRemainingGlobal] = useState("");
+  const [unitsRemainingCollectif, setUnitsRemainingCollectif] = useState("");
+  const [unitsRemainingVilla, setUnitsRemainingVilla] = useState("");
+  const [unitsRemainingVillaLot, setUnitsRemainingVillaLot] = useState("");
 
   // --- Typologies ---
   const [currentTypology, setCurrentTypology] = useState("");
+  const [currentTypologyCategory, setCurrentTypologyCategory] = useState("");
   const [surfaceHabitable, setSurfaceHabitable] = useState("");
   const [surfaceTerrasse, setSurfaceTerrasse] = useState("");
   const [surfaceTerrain, setSurfaceTerrain] = useState("");
@@ -70,7 +133,10 @@ export default function AddProjectScreen() {
   const [typologiesList, setTypologiesList] = useState<any[]>([]);
 
   // --- Densité ---
-  const [density, setDensity] = useState("");
+  const [densityGlobal, setDensityGlobal] = useState("");
+  const [densityCollectif, setDensityCollectif] = useState("");
+  const [densityVilla, setDensityVilla] = useState("");
+  const [densityVillaLot, setDensityVillaLot] = useState("");
   const [cus, setCus] = useState("");
 
   // --- Retail ---
@@ -83,50 +149,152 @@ export default function AddProjectScreen() {
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
 
+  // --- Unités de surface ---
+  const [unitTotalSurface, setUnitTotalSurface] = useState<"m²" | "ha">("m²");
+  const [unitCollectifSurface, setUnitCollectifSurface] = useState<"m²" | "ha">("m²");
+  const [unitVillaSurface, setUnitVillaSurface] = useState<"m²" | "ha">("m²");
+  const [unitVillaLotSurface, setUnitVillaLotSurface] = useState<"m²" | "ha">("m²");
+
   useFocusEffect(
     useCallback(() => {
-      setShowTypeModal(true);
+      // Réinitialiser TOUS les champs
+      setShowMainTypeModal(true);
+      setShowMixedTypeModal(false);
       setProjectType("");
-      setTypologiesList([]);
-      setDensity("");
-      setCus("");
       setMapType("standard");
+      
+      // Infos générales
+      setName("");
+      setCity("");
+      setQuartier("");
+      setDeveloper("");
+      setStatus("");
+      
+      // Surfaces
+      setSurfaceFonciereTotal("");
+      setSurfaceFonciereCollectif("");
+      setSurfaceFonciereVilla("");
+      setSurfaceFonciereVillaLot("");
+      
+      // Unités de surface
+      setUnitTotalSurface("m²");
+      setUnitCollectifSurface("m²");
+      setUnitVillaSurface("m²");
+      setUnitVillaLotSurface("m²");
+      
+      // Unités
+      setTotalUnitsGlobal("");
+      setTotalUnitsCollectif("");
+      setTotalUnitsVilla("");
+      setTotalUnitsVillaLot("");
+      
+      // Dates
+      setDeliveryDate("");
+      setStartCommercialDate("");
+      
+      // Commercialisation
+      setCommercializationRateGlobal("");
+      setCommercializationRateCollectif("");
+      setCommercializationRateVilla("");
+      setCommercializationRateVillaLot("");
+      
+      // Taux d'écoulement
+      setSalesVelocityGlobal("");
+      setSalesVelocityCollectif("");
+      setSalesVelocityVilla("");
+      setSalesVelocityVillaLot("");
+      
+      // Unités restantes
+      setUnitsRemainingGlobal("");
+      setUnitsRemainingCollectif("");
+      setUnitsRemainingVilla("");
+      setUnitsRemainingVillaLot("");
+      
+      // Typologies
+      setCurrentTypology("");
+      setCurrentTypologyCategory("");
+      setSurfaceHabitable("");
+      setSurfaceTerrasse("");
+      setSurfaceTerrain("");
+      setPricing("");
+      setUnits("");
+      setTypologiesList([]);
+      
+      // Densité
+      setDensityGlobal("");
+      setDensityCollectif("");
+      setDensityVilla("");
+      setDensityVillaLot("");
+      setCus("");
+      
+      // Retail
+      setGla("");
+      setPositionnement("");
+      setMixRetail("");
+      setEnseignes("");
+      
+      // Map
+      setLatitude(null);
+      setLongitude(null);
     }, [])
   );
 
-  const selectType = (type: string) => {
-    setProjectType(type);
-    setShowTypeModal(false);
-    // Réinitialiser les densités quand on change le type
-    setDensity("");
-    setCus("");
+  const selectMainType = (type: string) => {
+    if (type === "Mixte") {
+      setShowMixedTypeModal(true);
+      setShowMainTypeModal(false);
+    } else {
+      setProjectType(type);
+      setShowMainTypeModal(false);
+      // Initialiser la catégorie de typologie
+      if (type === "Collectif") setCurrentTypologyCategory("Collectif");
+      else if (type === "Villa") setCurrentTypologyCategory("Villa");
+      else if (type === "Lot de villas") setCurrentTypologyCategory("Lot de villas");
+    }
   };
 
-  // Fonction pour déterminer les champs de densité requis
-  const getDensityFields = () => {
-    const baseType = projectType.split("/")[0]; // Prendre le premier type en cas de types multiples
-    
-    if (baseType === "Collectif") {
-      return { hasDensity: true, label: "Densité/immeuble (unité/immeuble)", hasCus: false };
-    }
-    if (baseType === "Villa") {
-      return { hasDensity: true, label: "Densité/ha (unité/ha)", hasCus: false };
-    }
-    if (baseType === "Lot de villas") {
-      return { hasDensity: true, label: "Densité/ha (unité/ha)", hasCus: true };
-    }
-    return { hasDensity: false, label: "", hasCus: false };
+  const selectMixedType = (type: string) => {
+    setProjectType(type);
+    setShowMixedTypeModal(false);
+    // Pour les mixtes, initialiser avec la première catégorie
+    if (type.includes("Collectif")) setCurrentTypologyCategory("Collectif");
+    else if (type.startsWith("Villa")) setCurrentTypologyCategory("Villa");
   };
+
+  // Fonction pour déterminer les catégories du projet
+  const getProjectCategories = (): string[] => {
+    if (projectType === "Collectif") return ["Collectif"];
+    if (projectType === "Villa") return ["Villa"];
+    if (projectType === "Lot de villas") return ["Lot de villas"];
+    if (projectType === "Retail") return ["Retail"];
+    if (projectType === "Collectif/Villa") return ["Collectif", "Villa"];
+    if (projectType === "Collectif/Lot de villas") return ["Collectif", "Lot de villas"];
+    if (projectType === "Villa/Lot de villas") return ["Villa", "Lot de villas"];
+    if (projectType === "Collectif/Villa/Lot de villas") return ["Collectif", "Villa", "Lot de villas"];
+    return [];
+  };
+
+  // Fonction pour obtenir les typologies disponibles
+  const getTypologiesForCategory = (category: string): string[] => {
+    return typologiesOptions[category as keyof typeof typologiesOptions] || [];
+  };
+
+  const categories = getProjectCategories();
+  const isMixedProject = categories.length > 1;
 
   const addCurrentTypology = () => {
-    if (!currentTypology) {
-      Alert.alert("Erreur", "Choisissez une typologie");
+    // Pour projet simple, utiliser la catégorie par défaut. Pour mixte, vérifier la sélection
+    const categoryToUse = isMixedProject ? currentTypologyCategory : categories[0];
+
+    if (!currentTypology || !categoryToUse) {
+      Alert.alert("Erreur", "Choisissez une catégorie et une typologie");
       return;
     }
 
     setTypologiesList([
       ...typologiesList,
       {
+        typology_category: categoryToUse,
         typology: currentTypology,
         surfaceHabitable,
         surfaceTerrasse,
@@ -137,12 +305,31 @@ export default function AddProjectScreen() {
     ]);
 
     setCurrentTypology("");
+    // Garder la catégorie sélectionnée pour faciliter l'ajout multiple
+    if (isMixedProject) {
+      setCurrentTypologyCategory(currentTypologyCategory);
+    } else {
+      setCurrentTypologyCategory(categories[0]);
+    }
     setSurfaceHabitable("");
     setSurfaceTerrasse("");
     setSurfaceTerrain("");
     setPricing("");
     setUnits("");
   };
+
+// Fonction pour convertir une surface en m² avant envoi à la BD
+const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | null => {
+  if (!value || isNaN(parseFloat(value))) return null;
+  
+  const numValue = parseFloat(value);
+  
+  if (unit === "ha") {
+    return numValue * 10000; // ha → m²
+  }
+  
+  return numValue; // déjà en m²
+};
 
   const addProject = async () => {
     if (!latitude || !longitude) {
@@ -162,13 +349,28 @@ export default function AddProjectScreen() {
           developer,
           project_type: projectType,
           status,
-          surface_fonciere: parseFloat(surfaceFonciere) || null,
-          total_units: parseInt(totalUnits) || null,
+          surface_fonciere_totale: convertToM2ForDatabase(surfaceFonciereTotal, unitTotalSurface),
+          surface_fonciere_collectif: convertToM2ForDatabase(surfaceFonciereCollectif, unitCollectifSurface),
+          surface_fonciere_villa: convertToM2ForDatabase(surfaceFonciereVilla, unitVillaSurface),
+          surface_fonciere_lot_villas: convertToM2ForDatabase(surfaceFonciereVillaLot, unitVillaLotSurface),
+          total_units: parseInt(totalUnitsGlobal) || null,
+          total_units_collectif: parseInt(totalUnitsCollectif) || null,
+          total_units_villa: parseInt(totalUnitsVilla) || null,
+          total_units_lot_villas: parseInt(totalUnitsVillaLot) || null,
           delivery_date: deliveryDate || null,
           start_commercial_date: startCommercialDate || null,
-          commercialization_rate: parseFloat(commercializationRate) || null,
-          sales_velocity: parseFloat(salesVelocity) || null,
-          units_remaining: parseInt(unitsRemaining) || null,
+          commercialization_rate_global: parseFloat(commercializationRateGlobal) || null,
+          commercialization_rate_collectif: parseFloat(commercializationRateCollectif) || null,
+          commercialization_rate_villa: parseFloat(commercializationRateVilla) || null,
+          commercialization_rate_lot_villas: parseFloat(commercializationRateVillaLot) || null,
+          sales_velocity_global: parseFloat(salesVelocityGlobal) || null,
+          sales_velocity_collectif: parseFloat(salesVelocityCollectif) || null,
+          sales_velocity_villa: parseFloat(salesVelocityVilla) || null,
+          sales_velocity_lot_villas: parseFloat(salesVelocityVillaLot) || null,
+          units_remaining_global: parseInt(unitsRemainingGlobal) || null,
+          units_remaining_collectif: parseInt(unitsRemainingCollectif) || null,
+          units_remaining_villa: parseInt(unitsRemainingVilla) || null,
+          units_remaining_lot_villas: parseInt(unitsRemainingVillaLot) || null,
         },
       ])
       .select();
@@ -180,10 +382,12 @@ export default function AddProjectScreen() {
 
     const projectId = data[0].id;
 
+    // Sauvegarder les typologies
     for (let t of typologiesList) {
       await supabase.from("projects_typologies").insert([
         {
           project_id: projectId,
+          typology_category: t.typology_category,
           typology: t.typology,
           surface_habitable: parseFloat(t.surfaceHabitable) || null,
           surface_terrasse: parseFloat(t.surfaceTerrasse) || null,
@@ -194,21 +398,57 @@ export default function AddProjectScreen() {
       ]);
     }
 
-    if (density) {
+    // Sauvegarder les densités
+    if (densityGlobal) {
       await supabase.from("projects_density").insert([
         {
           project_id: projectId,
           density_type: "density",
-          density_value: parseFloat(density),
+          category: "global",
+          density_value: parseFloat(densityGlobal),
         },
       ]);
     }
 
-    if (cus) {
+    if (densityCollectif && categories.includes("Collectif")) {
+      await supabase.from("projects_density").insert([
+        {
+          project_id: projectId,
+          density_type: "density",
+          category: "Collectif",
+          density_value: parseFloat(densityCollectif),
+        },
+      ]);
+    }
+
+    if (densityVilla && categories.includes("Villa")) {
+      await supabase.from("projects_density").insert([
+        {
+          project_id: projectId,
+          density_type: "density",
+          category: "Villa",
+          density_value: parseFloat(densityVilla),
+        },
+      ]);
+    }
+
+    if (densityVillaLot && categories.includes("Lot de villas")) {
+      await supabase.from("projects_density").insert([
+        {
+          project_id: projectId,
+          density_type: "density",
+          category: "Lot de villas",
+          density_value: parseFloat(densityVillaLot),
+        },
+      ]);
+    }
+
+    if (cus && categories.includes("Lot de villas")) {
       await supabase.from("projects_density").insert([
         {
           project_id: projectId,
           density_type: "CUS",
+          category: "global",
           density_value: parseFloat(cus),
         },
       ]);
@@ -232,15 +472,16 @@ export default function AddProjectScreen() {
 
   return (
     <>
-      <Modal visible={showTypeModal} transparent animationType="fade">
+      {/* Modal Type Principal */}
+      <Modal visible={showMainTypeModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Choisissez le type de projet</Text>
-            {projectTypes.map((type) => (
+            {projectMainTypes.map((type: string) => (
               <TouchableOpacity
                 key={type}
                 style={styles.typeButton}
-                onPress={() => selectType(type)}
+                onPress={() => selectMainType(type)}
               >
                 <Text style={styles.typeButtonText}>{type}</Text>
               </TouchableOpacity>
@@ -249,7 +490,25 @@ export default function AddProjectScreen() {
         </View>
       </Modal>
 
-      {!showTypeModal && (
+      {/* Modal Type Mixte */}
+      <Modal visible={showMixedTypeModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Choisissez les types mixtes</Text>
+            {projectMixedTypes.map((type: string) => (
+              <TouchableOpacity
+                key={type}
+                style={styles.typeButton}
+                onPress={() => selectMixedType(type)}
+              >
+                <Text style={styles.typeButtonText}>{type}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
+      {projectType && (
         <ScrollView contentContainerStyle={styles.container}>
           <Text style={styles.mainTitle}>Ajouter un projet</Text>
 
@@ -260,20 +519,119 @@ export default function AddProjectScreen() {
           <TextInput placeholder="Quartier" style={styles.input} onChangeText={setQuartier} />
           <TextInput placeholder="Développeur" style={styles.input} onChangeText={setDeveloper} />
 
-          <TextInput
-            placeholder="Surface foncière (m²)"
-            style={styles.input}
-            onChangeText={setSurfaceFonciere}
-          />
+          {/* Surfaces Foncières */}
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Surfaces Foncières
+          </ThemedText>
+
+          <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+            <TextInput
+              placeholder="Surface foncière totale"
+              style={[styles.input, { flex: 1 }]}
+              value={surfaceFonciereTotal}
+              onChangeText={setSurfaceFonciereTotal}
+              keyboardType="decimal-pad"
+            />
+            <TouchableOpacity
+              style={[styles.unitToggleButton, { backgroundColor: unitTotalSurface === "m²" ? AppColors.primary.main : AppColors.primary.light }]}
+              onPress={() => toggleSurfaceUnit(surfaceFonciereTotal, unitTotalSurface, setSurfaceFonciereTotal, setUnitTotalSurface)}
+            >
+              <Text style={styles.unitToggleText}>{unitTotalSurface}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {isMixedProject && categories.includes("Collectif") && (
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+              <TextInput
+                placeholder="Surface foncière Collectif"
+                style={[styles.input, { flex: 1 }]}
+                value={surfaceFonciereCollectif}
+                onChangeText={setSurfaceFonciereCollectif}
+                keyboardType="decimal-pad"
+              />
+              <TouchableOpacity
+                style={[styles.unitToggleButton, { backgroundColor: unitCollectifSurface === "m²" ? AppColors.primary.main : AppColors.primary.light }]}
+                onPress={() => toggleSurfaceUnit(surfaceFonciereCollectif, unitCollectifSurface, setSurfaceFonciereCollectif, setUnitCollectifSurface)}
+              >
+                <Text style={styles.unitToggleText}>{unitCollectifSurface}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isMixedProject && categories.includes("Villa") && (
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+              <TextInput
+                placeholder="Surface foncière Villa"
+                style={[styles.input, { flex: 1 }]}
+                value={surfaceFonciereVilla}
+                onChangeText={setSurfaceFonciereVilla}
+                keyboardType="decimal-pad"
+              />
+              <TouchableOpacity
+                style={[styles.unitToggleButton, { backgroundColor: unitVillaSurface === "m²" ? AppColors.primary.main : AppColors.primary.light }]}
+                onPress={() => toggleSurfaceUnit(surfaceFonciereVilla, unitVillaSurface, setSurfaceFonciereVilla, setUnitVillaSurface)}
+              >
+                <Text style={styles.unitToggleText}>{unitVillaSurface}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isMixedProject && categories.includes("Lot de villas") && (
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+              <TextInput
+                placeholder="Surface foncière Lot de villas"
+                style={[styles.input, { flex: 1 }]}
+                value={surfaceFonciereVillaLot}
+                onChangeText={setSurfaceFonciereVillaLot}
+                keyboardType="decimal-pad"
+              />
+              <TouchableOpacity
+                style={[styles.unitToggleButton, { backgroundColor: unitVillaLotSurface === "m²" ? AppColors.primary.main : AppColors.primary.light }]}
+                onPress={() => toggleSurfaceUnit(surfaceFonciereVillaLot, unitVillaLotSurface, setSurfaceFonciereVillaLot, setUnitVillaLotSurface)}
+              >
+                <Text style={styles.unitToggleText}>{unitVillaLotSurface}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Total Units */}
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Nombre d'Unités
+          </ThemedText>
 
           <TextInput
             placeholder="Nombre total d'unités"
             style={styles.input}
-            onChangeText={setTotalUnits}
+            onChangeText={setTotalUnitsGlobal}
           />
+
+          {isMixedProject && categories.includes("Collectif") && (
+            <TextInput
+              placeholder="Nombre d'unités Collectif"
+              style={styles.input}
+              onChangeText={setTotalUnitsCollectif}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Villa") && (
+            <TextInput
+              placeholder="Nombre d'unités Villa"
+              style={styles.input}
+              onChangeText={setTotalUnitsVilla}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Lot de villas") && (
+            <TextInput
+              placeholder="Nombre d'unités Lot de villas"
+              style={styles.input}
+              onChangeText={setTotalUnitsVillaLot}
+            />
+          )}
 
           <TextInput placeholder="Statut" style={styles.input} onChangeText={setStatus} />
 
+          {/* Dates */}
           <TextInput
             placeholder="Date livraison (YYYY-MM-DD)"
             style={styles.input}
@@ -286,100 +644,201 @@ export default function AddProjectScreen() {
             onChangeText={setStartCommercialDate}
           />
 
-          <TextInput
-            placeholder="Taux commercialisation %"
-            style={styles.input}
-            onChangeText={setCommercializationRate}
-          />
+          {/* Commercialisation */}
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Commercialisation
+          </ThemedText>
 
           <TextInput
-            placeholder="Taux écoulement(unité/mois)"
+            placeholder="Taux commercialisation global %"
             style={styles.input}
-            onChangeText={setSalesVelocity}
+            onChangeText={setCommercializationRateGlobal}
           />
+
+          {isMixedProject && categories.includes("Collectif") && (
+            <TextInput
+              placeholder="Taux commercialisation Collectif %"
+              style={styles.input}
+              onChangeText={setCommercializationRateCollectif}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Villa") && (
+            <TextInput
+              placeholder="Taux commercialisation Villa %"
+              style={styles.input}
+              onChangeText={setCommercializationRateVilla}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Lot de villas") && (
+            <TextInput
+              placeholder="Taux commercialisation Lot de villas %"
+              style={styles.input}
+              onChangeText={setCommercializationRateVillaLot}
+            />
+          )}
+
+          {/* Taux d'écoulement */}
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Taux d'Écoulement (unité/mois)
+          </ThemedText>
 
           <TextInput
-            placeholder="Unités restantes"
+            placeholder="Taux d'écoulement global (unité/mois)"
             style={styles.input}
-            onChangeText={setUnitsRemaining}
+            onChangeText={setSalesVelocityGlobal}
           />
 
+          {isMixedProject && categories.includes("Collectif") && (
+            <TextInput
+              placeholder="Taux d'écoulement Collectif (unité/mois)"
+              style={styles.input}
+              onChangeText={setSalesVelocityCollectif}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Villa") && (
+            <TextInput
+              placeholder="Taux d'écoulement Villa (unité/mois)"
+              style={styles.input}
+              onChangeText={setSalesVelocityVilla}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Lot de villas") && (
+            <TextInput
+              placeholder="Taux d'écoulement Lot de villas (unité/mois)"
+              style={styles.input}
+              onChangeText={setSalesVelocityVillaLot}
+            />
+          )}
+
+          {/* Unités Restantes */}
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Unités Restantes
+          </ThemedText>
+
+          <TextInput
+            placeholder="Unités restantes global"
+            style={styles.input}
+            onChangeText={setUnitsRemainingGlobal}
+          />
+
+          {isMixedProject && categories.includes("Collectif") && (
+            <TextInput
+              placeholder="Unités restantes Collectif"
+              style={styles.input}
+              onChangeText={setUnitsRemainingCollectif}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Villa") && (
+            <TextInput
+              placeholder="Unités restantes Villa"
+              style={styles.input}
+              onChangeText={setUnitsRemainingVilla}
+            />
+          )}
+
+          {isMixedProject && categories.includes("Lot de villas") && (
+            <TextInput
+              placeholder="Unités restantes Lot de villas"
+              style={styles.input}
+              onChangeText={setUnitsRemainingVillaLot}
+            />
+          )}
+
+          {/* Typologies */}
           {projectType !== "Retail" && (
             <>
-              <ThemedText style={{ marginTop: 10, fontWeight: "bold" }}>
-                Ajouter une typologie
+              <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+                Ajouter une Typologie
               </ThemedText>
 
-              <View style={{ marginBottom: 10 }}>
-                <Text>Typologie</Text>
-
-                <ScrollView horizontal>
-                  {(typologiesOptions[projectType as keyof typeof typologiesOptions] || []).map(
-                    (t) => (
+              {isMixedProject ? (
+                <>
+                  <Text style={{ marginBottom: 10, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Catégorie</Text>
+                  <ScrollView horizontal style={{ marginBottom: 12 }}>
+                    {categories.map((cat) => (
                       <TouchableOpacity
-                        key={t}
+                        key={cat}
                         style={{
-                          padding: 8,
+                          padding: 10,
                           margin: 4,
-                          borderWidth: 1,
-                          borderColor: currentTypology === t ? "blue" : "#ccc",
-                          borderRadius: 6,
+                          borderWidth: 2,
+                          borderColor: currentTypologyCategory === cat ? AppColors.primary.main : "#ccc",
+                          borderRadius: 8,
+                          backgroundColor: currentTypologyCategory === cat ? AppColors.primary.light + "30" : "#fff",
                         }}
-                        onPress={() => setCurrentTypology(t)}
+                        onPress={() => setCurrentTypologyCategory(cat)}
                       >
-                        <Text>{t}</Text>
+                        <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{cat}</Text>
                       </TouchableOpacity>
-                    )
-                  )}
-                </ScrollView>
+                    ))}
+                  </ScrollView>
+                </>
+              ) : null}
 
-                <TextInput
-                  placeholder="Surface habitable (m²)"
-                  style={styles.input}
-                  value={surfaceHabitable}
-                  onChangeText={setSurfaceHabitable}
-                />
+              <Text style={{ marginBottom: 10, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Typologie</Text>
+              <ScrollView horizontal style={{ marginBottom: 12 }}>
+                {getTypologiesForCategory(currentTypologyCategory || categories[0]).map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={{
+                      padding: 10,
+                      margin: 4,
+                      borderWidth: 2,
+                      borderColor: currentTypology === t ? AppColors.primary.main : "#ccc",
+                      borderRadius: 8,
+                      backgroundColor: currentTypology === t ? AppColors.primary.light + "30" : "#fff",
+                    }}
+                    onPress={() => setCurrentTypology(t)}
+                  >
+                    <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
-                <TextInput
-                  placeholder="Surface terrasse (m²)"
-                  style={styles.input}
-                  value={surfaceTerrasse}
-                  onChangeText={setSurfaceTerrasse}
-                />
+              <TextInput
+                placeholder="Surface habitable (m²)"
+                style={styles.input}
+                value={surfaceHabitable}
+                onChangeText={setSurfaceHabitable}
+              />
+              <TextInput
+                placeholder="Surface terrasse (m²)"
+                style={styles.input}
+                value={surfaceTerrasse}
+                onChangeText={setSurfaceTerrasse}
+              />
+              <TextInput
+                placeholder="Surface terrain (m²)"
+                style={styles.input}
+                value={surfaceTerrain}
+                onChangeText={setSurfaceTerrain}
+              />
+              <TextInput
+                placeholder="Prix de vente (MAD)"
+                style={styles.input}
+                value={pricing}
+                onChangeText={setPricing}
+              />
+              <TextInput
+                placeholder="Nombre unités"
+                style={styles.input}
+                value={units}
+                onChangeText={setUnits}
+              />
 
-                <TextInput
-                  placeholder="Surface terrain (m²)"
-                  style={styles.input}
-                  value={surfaceTerrain}
-                  onChangeText={setSurfaceTerrain}
-                />
-
-                <TextInput
-                  placeholder="Prix de vente (MAD)"
-                  style={styles.input}
-                  value={pricing}
-                  onChangeText={setPricing}
-                />
-
-                <TextInput
-                  placeholder="Nombre unités"
-                  style={styles.input}
-                  value={units}
-                  onChangeText={setUnits}
-                />
-
-                <Button title="Ajouter typologie" onPress={addCurrentTypology} />
-              </View>
+              <Button title="Ajouter Typologie" onPress={addCurrentTypology} />
 
               {typologiesList.length > 0 && (
-                <View style={{ marginTop: 10 }}>
-                  <Text>Typologies ajoutées :</Text>
-
+                <View style={{ marginTop: 15 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: AppColors.primary.main }}>Typologies ajoutées :</Text>
                   {typologiesList.map((t, idx) => (
-                    <Text key={idx}>
-                      {t.typology} - Habitable: {t.surfaceHabitable} m² - Terrasse:{" "}
-                      {t.surfaceTerrasse} m² - Terrain: {t.surfaceTerrain} m² - Prix: {t.pricing} -
-                      Units: {t.units}
+                    <Text key={idx} style={{ fontSize: 12, color: AppColors.ui.text, marginTop: 8 }}>
+                      [{t.typology_category}] {t.typology} - Habitable: {t.surfaceHabitable} m² - Prix: {t.pricing} - Units: {t.units}
                     </Text>
                   ))}
                 </View>
@@ -387,56 +846,119 @@ export default function AddProjectScreen() {
             </>
           )}
 
+          {/* Retail */}
           {projectType === "Retail" && (
             <>
               <TextInput placeholder="GLA" style={styles.input} onChangeText={setGla} />
-              <TextInput
-                placeholder="Positionnement"
-                style={styles.input}
-                onChangeText={setPositionnement}
-              />
-              <TextInput
-                placeholder="Mix retail"
-                style={styles.input}
-                onChangeText={setMixRetail}
-              />
-              <TextInput
-                placeholder="Enseignes"
-                style={styles.input}
-                onChangeText={setEnseignes}
-              />
+              <TextInput placeholder="Positionnement" style={styles.input} onChangeText={setPositionnement} />
+              <TextInput placeholder="Mix retail" style={styles.input} onChangeText={setMixRetail} />
+              <TextInput placeholder="Enseignes" style={styles.input} onChangeText={setEnseignes} />
             </>
           )}
 
-          {/* Densité - affichée selon le type de projet */}
-          {(() => {
-            const densityFields = getDensityFields();
-            return densityFields.hasDensity ? (
-              <View style={{ marginTop: 20, marginBottom: 20 }}>
-                <ThemedText style={{ fontSize: 16, fontWeight: "bold", marginBottom: 10 }}>
-                  Densité
-                </ThemedText>
+          {/* Densité */}
+          {projectType !== "Retail" && (
+            <>
+              <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+                Densité
+              </ThemedText>
 
-                <TextInput
-                  placeholder={densityFields.label}
-                  style={styles.input}
-                  value={density}
-                  onChangeText={setDensity}
-                  keyboardType="decimal-pad"
-                />
+              {!isMixedProject ? (
+                <>
+                  {projectType === "Collectif" && (
+                    <TextInput
+                      placeholder="Densité Collectif (unités/immeuble)"
+                      style={styles.input}
+                      value={densityGlobal}
+                      onChangeText={setDensityGlobal}
+                      keyboardType="decimal-pad"
+                    />
+                  )}
 
-                {densityFields.hasCus && (
-                  <TextInput
-                    placeholder="CUS"
-                    style={styles.input}
-                    value={cus}
-                    onChangeText={setCus}
-                    keyboardType="decimal-pad"
-                  />
-                )}
-              </View>
-            ) : null;
-          })()}
+                  {projectType === "Villa" && (
+                    <TextInput
+                      placeholder="Densité/ha (unités/ha)"
+                      style={styles.input}
+                      value={densityGlobal}
+                      onChangeText={setDensityGlobal}
+                      keyboardType="decimal-pad"
+                    />
+                  )}
+
+                  {projectType === "Lot de villas" && (
+                    <>
+                      <TextInput
+                        placeholder="Densité/ha (unités/ha)"
+                        style={styles.input}
+                        value={densityGlobal}
+                        onChangeText={setDensityGlobal}
+                        keyboardType="decimal-pad"
+                      />
+                      <TextInput
+                        placeholder="CUS"
+                        style={styles.input}
+                        value={cus}
+                        onChangeText={setCus}
+                        keyboardType="decimal-pad"
+                      />
+                    </>
+                  )}
+                </>
+              ) : (
+                <>
+                  {/* Densité globale pour les mixtes */}
+                  {projectType === "Villa/Lot de villas" && (
+                    <TextInput
+                      placeholder="Densité globale (unités/ha)"
+                      style={styles.input}
+                      value={densityGlobal}
+                      onChangeText={setDensityGlobal}
+                      keyboardType="decimal-pad"
+                    />
+                  )}
+
+                  {isMixedProject && categories.includes("Collectif") && (
+                    <TextInput
+                      placeholder="Densité Collectif (unités/immeuble)"
+                      style={styles.input}
+                      value={densityCollectif}
+                      onChangeText={setDensityCollectif}
+                      keyboardType="decimal-pad"
+                    />
+                  )}
+
+                  {isMixedProject && categories.includes("Villa") && (
+                    <TextInput
+                      placeholder="Densité Villa (unités/ha)"
+                      style={styles.input}
+                      value={densityVilla}
+                      onChangeText={setDensityVilla}
+                      keyboardType="decimal-pad"
+                    />
+                  )}
+
+                  {isMixedProject && categories.includes("Lot de villas") && (
+                    <>
+                      <TextInput
+                        placeholder="Densité Lot de villas (unités/ha)"
+                        style={styles.input}
+                        value={densityVillaLot}
+                        onChangeText={setDensityVillaLot}
+                        keyboardType="decimal-pad"
+                      />
+                      <TextInput
+                        placeholder="CUS"
+                        style={styles.input}
+                        value={cus}
+                        onChangeText={setCus}
+                        keyboardType="decimal-pad"
+                      />
+                    </>
+                  )}
+                </>
+              )}
+            </>
+          )}
 
           <ThemedText style={styles.locationTitle}>Localisation</ThemedText>
           <ThemedText style={styles.locationSubtitle}>Situez le projet sur la carte</ThemedText>
@@ -674,6 +1196,39 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: 0.5,
+    fontFamily: "Century Gothic",
+  },
+
+  convertButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 50,
+  },
+
+  convertButtonText: {
+    color: AppColors.ui.background,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  unitToggleButton: {
+    paddingVertical: 0,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 60,
+    height: 50,
+  },
+
+  unitToggleText: {
+    color: AppColors.ui.background,
+    fontSize: 13,
+    fontWeight: "700",
     fontFamily: "Century Gothic",
   },
 });
