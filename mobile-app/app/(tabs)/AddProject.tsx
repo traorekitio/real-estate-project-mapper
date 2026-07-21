@@ -125,10 +125,17 @@ export default function AddProjectScreen() {
   // --- Typologies ---
   const [currentTypology, setCurrentTypology] = useState("");
   const [currentTypologyCategory, setCurrentTypologyCategory] = useState("");
-  const [surfaceHabitable, setSurfaceHabitable] = useState("");
-  const [surfaceTerrasse, setSurfaceTerrasse] = useState("");
-  const [surfaceTerrain, setSurfaceTerrain] = useState("");
-  const [pricing, setPricing] = useState("");
+  const [surfaceHabitableMin, setSurfaceHabitableMin] = useState("");
+  const [surfaceHabitableMax, setSurfaceHabitableMax] = useState("");
+  const [surfaceTerrasseMin, setSurfaceTerrasseMin] = useState("");
+  const [surfaceTerrasseMax, setSurfaceTerrasseMax] = useState("");
+  const [surfaceTerrainMin, setSurfaceTerrainMin] = useState("");
+  const [surfaceTerrainMax, setSurfaceTerrainMax] = useState("");
+  const [pricingMode, setPricingMode] = useState<"from" | "between">("from");
+  const [pricingMin, setPricingMin] = useState("");
+  const [pricingMax, setPricingMax] = useState("");
+  const [pricingUnit, setPricingUnit] = useState("MMAD");
+  const [pricingComment, setPricingComment] = useState("");
   const [units, setUnits] = useState("");
   const [typologiesList, setTypologiesList] = useState<any[]>([]);
 
@@ -213,10 +220,17 @@ export default function AddProjectScreen() {
       // Typologies
       setCurrentTypology("");
       setCurrentTypologyCategory("");
-      setSurfaceHabitable("");
-      setSurfaceTerrasse("");
-      setSurfaceTerrain("");
-      setPricing("");
+      setSurfaceHabitableMin("");
+      setSurfaceHabitableMax("");
+      setSurfaceTerrasseMin("");
+      setSurfaceTerrasseMax("");
+      setSurfaceTerrainMin("");
+      setSurfaceTerrainMax("");
+      setPricingMode("from");
+      setPricingMin("");
+      setPricingMax("");
+      setPricingUnit("MMAD");
+      setPricingComment("");
       setUnits("");
       setTypologiesList([]);
       
@@ -296,10 +310,17 @@ export default function AddProjectScreen() {
       {
         typology_category: categoryToUse,
         typology: currentTypology,
-        surfaceHabitable,
-        surfaceTerrasse,
-        surfaceTerrain,
-        pricing,
+        surfaceHabitableMin,
+        surfaceHabitableMax,
+        surfaceTerrasseMin,
+        surfaceTerrasseMax,
+        surfaceTerrainMin,
+        surfaceTerrainMax,
+        pricingMode,
+        pricingMin,
+        pricingMax,
+        pricingUnit,
+        pricingComment,
         units,
       },
     ]);
@@ -311,10 +332,17 @@ export default function AddProjectScreen() {
     } else {
       setCurrentTypologyCategory(categories[0]);
     }
-    setSurfaceHabitable("");
-    setSurfaceTerrasse("");
-    setSurfaceTerrain("");
-    setPricing("");
+    setSurfaceHabitableMin("");
+    setSurfaceHabitableMax("");
+    setSurfaceTerrasseMin("");
+    setSurfaceTerrasseMax("");
+    setSurfaceTerrainMin("");
+    setSurfaceTerrainMax("");
+    setPricingMode("from");
+    setPricingMin("");
+    setPricingMax("");
+    setPricingUnit("MMAD");
+    setPricingComment("");
     setUnits("");
   };
 
@@ -389,10 +417,17 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           project_id: projectId,
           typology_category: t.typology_category,
           typology: t.typology,
-          surface_habitable: parseFloat(t.surfaceHabitable) || null,
-          surface_terrasse: parseFloat(t.surfaceTerrasse) || null,
-          surface_terrain: parseFloat(t.surfaceTerrain) || null,
-          pricing: t.pricing,
+          surface_habitable_min: parseFloat(t.surfaceHabitableMin) || null,
+          surface_habitable_max: parseFloat(t.surfaceHabitableMax) || null,
+          surface_terrasse_min: parseFloat(t.surfaceTerrasseMin) || null,
+          surface_terrasse_max: parseFloat(t.surfaceTerrasseMax) || null,
+          surface_terrain_min: parseFloat(t.surfaceTerrainMin) || null,
+          surface_terrain_max: parseFloat(t.surfaceTerrainMax) || null,
+          pricing_type: t.pricingMode,
+          pricing_min: parseFloat(t.pricingMin) || null,
+          pricing_max: parseFloat(t.pricingMax) || null,
+          pricing_unit: t.pricingUnit || null,
+          pricing_comment: t.pricingComment || null,
           units: parseInt(t.units) || null,
         },
       ]);
@@ -800,35 +835,120 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                 ))}
               </ScrollView>
 
+              <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Surface habitable</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Min (m²)"
+                  style={[styles.input, { flex: 1 }]}
+                  value={surfaceHabitableMin}
+                  onChangeText={setSurfaceHabitableMin}
+                  keyboardType="decimal-pad"
+                />
+                <TextInput
+                  placeholder="Max (m²)"
+                  style={[styles.input, { flex: 1 }]}
+                  value={surfaceHabitableMax}
+                  onChangeText={setSurfaceHabitableMax}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Surface terrasse</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Min (m²)"
+                  style={[styles.input, { flex: 1 }]}
+                  value={surfaceTerrasseMin}
+                  onChangeText={setSurfaceTerrasseMin}
+                  keyboardType="decimal-pad"
+                />
+                <TextInput
+                  placeholder="Max (m²)"
+                  style={[styles.input, { flex: 1 }]}
+                  value={surfaceTerrasseMax}
+                  onChangeText={setSurfaceTerrasseMax}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Surface terrain</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Min (m²)"
+                  style={[styles.input, { flex: 1 }]}
+                  value={surfaceTerrainMin}
+                  onChangeText={setSurfaceTerrainMin}
+                  keyboardType="decimal-pad"
+                />
+                <TextInput
+                  placeholder="Max (m²)"
+                  style={[styles.input, { flex: 1 }]}
+                  value={surfaceTerrainMax}
+                  onChangeText={setSurfaceTerrainMax}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Prix de vente</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                {(["from", "between"] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: pricingMode === mode ? AppColors.primary.main : AppColors.gray.lighter,
+                      backgroundColor: pricingMode === mode ? AppColors.primary.light : AppColors.ui.background,
+                      alignItems: "center",
+                    }}
+                    onPress={() => setPricingMode(mode)}
+                  >
+                    <Text style={{ color: pricingMode === mode ? AppColors.ui.background : AppColors.ui.text, fontWeight: "700" }}>
+                      {mode === "from" ? "À partir" : "Entre"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Prix min"
+                  style={[styles.input, { flex: 1 }]}
+                  value={pricingMin}
+                  onChangeText={setPricingMin}
+                  keyboardType="decimal-pad"
+                />
+                {pricingMode === "between" && (
+                  <TextInput
+                    placeholder="Prix max"
+                    style={[styles.input, { flex: 1 }]}
+                    value={pricingMax}
+                    onChangeText={setPricingMax}
+                    keyboardType="decimal-pad"
+                  />
+                )}
+              </View>
+
               <TextInput
-                placeholder="Surface habitable (m²)"
+                placeholder="Unité prix (MMAD, MAD, etc.)"
                 style={styles.input}
-                value={surfaceHabitable}
-                onChangeText={setSurfaceHabitable}
+                value={pricingUnit}
+                onChangeText={setPricingUnit}
               />
               <TextInput
-                placeholder="Surface terrasse (m²)"
+                placeholder="Commentaire prix (ex: soit 46 666 MAD/m²)"
                 style={styles.input}
-                value={surfaceTerrasse}
-                onChangeText={setSurfaceTerrasse}
-              />
-              <TextInput
-                placeholder="Surface terrain (m²)"
-                style={styles.input}
-                value={surfaceTerrain}
-                onChangeText={setSurfaceTerrain}
-              />
-              <TextInput
-                placeholder="Prix de vente (MAD)"
-                style={styles.input}
-                value={pricing}
-                onChangeText={setPricing}
+                value={pricingComment}
+                onChangeText={setPricingComment}
               />
               <TextInput
                 placeholder="Nombre unités"
                 style={styles.input}
                 value={units}
                 onChangeText={setUnits}
+                keyboardType="decimal-pad"
               />
 
               <Button title="Ajouter Typologie" onPress={addCurrentTypology} />
@@ -836,11 +956,20 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               {typologiesList.length > 0 && (
                 <View style={{ marginTop: 15 }}>
                   <Text style={{ fontSize: 14, fontWeight: "700", color: AppColors.primary.main }}>Typologies ajoutées :</Text>
-                  {typologiesList.map((t, idx) => (
-                    <Text key={idx} style={{ fontSize: 12, color: AppColors.ui.text, marginTop: 8 }}>
-                      [{t.typology_category}] {t.typology} - Habitable: {t.surfaceHabitable} m² - Prix: {t.pricing} - Units: {t.units}
-                    </Text>
-                  ))}
+                  {typologiesList.map((t, idx) => {
+                    const habitableRange = t.surfaceHabitableMax ? `${t.surfaceHabitableMin}-${t.surfaceHabitableMax}` : `${t.surfaceHabitableMin}`;
+                    const terrasseRange = t.surfaceTerrasseMax ? `${t.surfaceTerrasseMin}-${t.surfaceTerrasseMax}` : t.surfaceTerrasseMin;
+                    const terrainRange = t.surfaceTerrainMax ? `${t.surfaceTerrainMin}-${t.surfaceTerrainMax}` : t.surfaceTerrainMin;
+                    const priceRange = t.pricingMode === "between"
+                      ? `Entre ${t.pricingMin} et ${t.pricingMax} ${t.pricingUnit}`
+                      : `À partir de ${t.pricingMin} ${t.pricingUnit}`;
+
+                    return (
+                      <Text key={idx} style={{ fontSize: 12, color: AppColors.ui.text, marginTop: 8 }}>
+                        [{t.typology_category}] {t.typology} - Habitable: {habitableRange} m² - Terrasse: {terrasseRange ? `${terrasseRange} m²` : "-"} - Terrain: {terrainRange ? `${terrainRange} m²` : "-"} - Prix: {priceRange} - Units: {t.units}
+                      </Text>
+                    );
+                  })}
                 </View>
               )}
             </>
