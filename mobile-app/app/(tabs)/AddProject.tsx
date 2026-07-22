@@ -1,6 +1,6 @@
 // mobile-app/app/(tabs)/AddProject.tsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   TextInput,
@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { useRouter, useFocusEffect } from "expo-router";
+import { OpenLocationCode } from "open-location-code";
 
 import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
@@ -139,6 +140,12 @@ export default function AddProjectScreen() {
   const [units, setUnits] = useState("");
   const [typologiesList, setTypologiesList] = useState<any[]>([]);
 
+  // --- Localisation ---
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationResults, setLocationResults] = useState<any[]>([]);
+  const [loadingLocationSearch, setLoadingLocationSearch] = useState(false);
+  const [selectedLocationLabel, setSelectedLocationLabel] = useState("");
+
   // --- Densité ---
   const [densityGlobal, setDensityGlobal] = useState("");
   const [densityCollectif, setDensityCollectif] = useState("");
@@ -155,6 +162,14 @@ export default function AddProjectScreen() {
   // --- Map ---
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 33.5731,
+    longitude: -7.5898,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
+  const mapRef = useRef<MapView | null>(null);
+  const openLocationCode = new OpenLocationCode();
 
   // --- Unités de surface ---
   const [unitTotalSurface, setUnitTotalSurface] = useState<"m²" | "ha">("m²");
@@ -344,6 +359,153 @@ export default function AddProjectScreen() {
     setPricingUnit("MMAD");
     setPricingComment("");
     setUnits("");
+  };
+
+  const extractPlusCode = (text: string): string | null => {
+    const match = text.match(/[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,4}/i);
+    return match ? match[0].toUpperCase() : null;
+  };
+
+  const getPhotonResults = async (query: string) => {
+    const response = await fetch(
+      `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=fr`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "RealEstateMapper/1.0 (contact@votre-domaine.com)",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error("Photon search failed", response.status, text);
+      return [];
+    }
+
+    const data = await response.json();
+    if (!data || !Array.isArray(data.features)) {
+      return [];
+    }
+
+    return data.features.map((feature: any) => {
+      const props = feature.properties || {};
+      const coords = feature.geometry?.coordinates || [];
+      const labelParts = [props.name, props.street, props.city, props.state, props.country]
+        .filter(Boolean);
+      return {
+        lat: coords[1]?.toString() || "0",
+        lon: coords[0]?.toString() || "0",
+        display_name: labelParts.join(", ") || "Résultat de localisation",
+        type: props.type || props.osm_key || "",
+      };
+    });
+  };
+
+  const geocodeReferenceLocation = async (query: string) => {
+    const results = await getPhotonResults(query);
+    if (results.length === 0) return null;
+    return {
+      latitude: parseFloat(results[0].lat),
+      longitude: parseFloat(results[0].lon),
+    };
+  };
+
+  const decodePlusCodeQuery = async (query: string, plusCode: string) => {
+    if (!plusCode) return null;
+
+    if (openLocationCode.isValid(plusCode) && !openLocationCode.isShort(plusCode)) {
+      const decoded = openLocationCode.decode(plusCode);
+      return {
+        lat: decoded.latitudeCenter.toString(),
+        lon: decoded.longitudeCenter.toString(),
+        display_name: plusCode,
+      };
+    }
+
+    const context = query.replace(plusCode, "").trim();
+    if (!context) {
+      return null;
+    }
+
+    const reference = await geocodeReferenceLocation(context);
+    if (!reference) {
+      return null;
+    }
+
+    const recoveredCode = openLocationCode.recoverNearest(plusCode, reference.latitude, reference.longitude);
+    if (typeof recoveredCode !== "string") {
+      return null;
+    }
+
+    const decoded = openLocationCode.decode(recoveredCode);
+    return {
+      lat: decoded.latitudeCenter.toString(),
+      lon: decoded.longitudeCenter.toString(),
+      display_name: `${recoveredCode} - ${context}`,
+    };
+  };
+
+  const searchLocation = async () => {
+    const query = locationQuery.trim();
+    if (!query) {
+      Alert.alert("Recherche", "Entrez une adresse ou un lieu à rechercher.");
+      return;
+    }
+
+    setLoadingLocationSearch(true);
+    try {
+      const plusCode = extractPlusCode(query);
+      if (plusCode) {
+        const decoded = await decodePlusCodeQuery(query, plusCode);
+        if (decoded) {
+          applyLocationResult(decoded);
+          setLoadingLocationSearch(false);
+          return;
+        }
+      }
+
+      const results = await getPhotonResults(query);
+      if (results.length === 0) {
+        setLocationResults([]);
+        Alert.alert("Aucun résultat", "Aucun emplacement trouvé pour cette recherche.");
+        return;
+      }
+
+      setLocationResults(results);
+    } catch (error) {
+      console.error("Location search error", error);
+      Alert.alert("Erreur", "Impossible de rechercher l'emplacement, réessayez.");
+      setLocationResults([]);
+    } finally {
+      setLoadingLocationSearch(false);
+    }
+  };
+
+  const applyLocationResult = (result: any) => {
+    const latitudeResult = parseFloat(result.lat);
+    const longitudeResult = parseFloat(result.lon);
+    if (Number.isNaN(latitudeResult) || Number.isNaN(longitudeResult)) {
+      Alert.alert("Erreur", "Coordonnées invalides pour ce résultat.");
+      return;
+    }
+
+    const newRegion = {
+      latitude: latitudeResult,
+      longitude: longitudeResult,
+      latitudeDelta: 0.01,
+      longitudeDelta: 0.01,
+    };
+
+    setLatitude(latitudeResult);
+    setLongitude(longitudeResult);
+    setMapRegion(newRegion);
+    setSelectedLocationLabel(result.display_name || locationQuery);
+    setLocationResults([]);
+
+    if (mapRef.current) {
+      mapRef.current.animateToRegion(newRegion, 600);
+    }
   };
 
 // Fonction pour convertir une surface en m² avant envoi à la BD
@@ -1090,7 +1252,54 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           )}
 
           <ThemedText style={styles.locationTitle}>Localisation</ThemedText>
-          <ThemedText style={styles.locationSubtitle}>Situez le projet sur la carte</ThemedText>
+          <ThemedText style={styles.locationSubtitle}>Situez le projet sur la carte ou recherchez une adresse</ThemedText>
+
+          <View style={{ marginBottom: 12 }}>
+            <TextInput
+              placeholder="Rechercher une adresse, un lieu ou un code plus"
+              style={styles.input}
+              value={locationQuery}
+              onChangeText={setLocationQuery}
+              onSubmitEditing={searchLocation}
+              returnKeyType="search"
+            />
+            <TouchableOpacity
+              style={styles.locationSearchButton}
+              onPress={searchLocation}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.locationSearchButtonText}>
+                {loadingLocationSearch ? "Recherche..." : "Rechercher"}
+              </Text>
+            </TouchableOpacity>
+
+            {selectedLocationLabel ? (
+              <Text style={styles.selectedLocationText} numberOfLines={2}>
+                Localisation sélectionnée : {selectedLocationLabel}
+              </Text>
+            ) : null}
+
+            {locationResults.length > 0 && (
+              <View style={styles.locationResultsContainer}>
+                {locationResults.map((result, index) => (
+                  <TouchableOpacity
+                    key={result.place_id ?? index}
+                    style={styles.locationResultItem}
+                    onPress={() => applyLocationResult(result)}
+                  >
+                    <Text style={styles.locationResultTitle} numberOfLines={2}>
+                      {result.display_name}
+                    </Text>
+                    {result.type ? (
+                      <Text style={styles.locationResultSubtitle} numberOfLines={1}>
+                        {result.type}
+                      </Text>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
           {/* Boutons pour changer le type de carte */}
           <View style={styles.mapTypeContainer}>
@@ -1141,17 +1350,21 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           </View>
 
           <MapView
+            ref={(ref) => { mapRef.current = ref; }}
             style={styles.map}
             mapType={mapType}
-            initialRegion={{
-              latitude: 33.5731,
-              longitude: -7.5898,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
-            }}
+            region={mapRegion}
             onPress={(e) => {
-              setLatitude(e.nativeEvent.coordinate.latitude);
-              setLongitude(e.nativeEvent.coordinate.longitude);
+              const lat = e.nativeEvent.coordinate.latitude;
+              const lon = e.nativeEvent.coordinate.longitude;
+              setLatitude(lat);
+              setLongitude(lon);
+              setMapRegion({
+                latitude: lat,
+                longitude: lon,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              });
             }}
           >
             {latitude && longitude && <Marker coordinate={{ latitude, longitude }} />}
@@ -1359,5 +1572,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     fontFamily: "Century Gothic",
+  },
+
+  locationSearchButton: {
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: AppColors.primary.main,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  locationSearchButtonText: {
+    color: AppColors.ui.background,
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  selectedLocationText: {
+    marginTop: 10,
+    color: AppColors.primary.main,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
+  locationResultsContainer: {
+    marginTop: 10,
+    borderRadius: 10,
+    backgroundColor: AppColors.ui.background,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    overflow: "hidden",
+  },
+
+  locationResultItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderColor: AppColors.gray.lighter,
+  },
+
+  locationResultTitle: {
+    color: AppColors.ui.text,
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+
+  locationResultSubtitle: {
+    color: AppColors.gray.dark,
+    fontSize: 12,
   },
 });
