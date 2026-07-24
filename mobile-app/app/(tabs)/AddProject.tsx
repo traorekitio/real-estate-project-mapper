@@ -36,6 +36,176 @@ const typologiesOptions = {
   "Lot de villas": ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
 };
 
+const moroccoCities = [
+  "Agadir",
+  "Ahfir",
+  "Aït Melloul",
+  "Al Hoceïma",
+  "Asilah",
+  "Azemmour",
+  "Azrou",
+  "Béni Mellal",
+  "Berkane",
+  "Berrechid",
+  "Bouarfa",
+  "Bouskoura",
+  "Bouznika",
+  "Casablanca",
+  "Chefchaouen",
+  "Chichaoua",
+  "Dakhla",
+  "El Hajeb",
+  "El Jadida",
+  "Errachidia",
+  "Essaouira",
+  "Fès",
+  "Fnideq",
+  "Guelmim",
+  "Ifrane",
+  "Jerada",
+  "Kénitra",
+  "Khemisset",
+  "Khémis Zemamra",
+  "Khénifra",
+  "Khouribga",
+  "Ksar El Kébir",
+  "Laâyoune",
+  "Larache",
+  "Martil",
+  "Marrakech",
+  "Mechra Bel Ksiri",
+  "Midelt",
+  "Mohammédia",
+  "Nador",
+  "Ouarzazate",
+  "Ouezzane",
+  "Oujda",
+  "Rabat",
+  "Safi",
+  "Salé",
+  "Sefrou",
+  "Settat",
+  "Sidi Bennour",
+  "Sidi Ifni",
+  "Sidi Kacem",
+  "Sidi Slimane",
+  "Skhirat",
+  "Souk El Arbaa",
+  "Taounate",
+  "Tarfaya",
+  "Taroudant",
+  "Taourirt",
+  "Taza",
+  "Témara",
+  "Tétouan",
+  "Tinghir",
+  "Tiznit",
+  "Youssoufia",
+  "Zagora",
+  "Autre",
+];
+
+const neighbourhoodOptions = [
+  "Anfa",
+  "Gauthier",
+  "Maarif",
+  "Sidi Maarouf",
+  "Ain Sebaa",
+  "Hay Hassani",
+  "Hay Riad",
+  "Agdal",
+  "Guéliz",
+  "Palmeraie",
+  "Sidi Belyout",
+  "Centre Ville",
+  "Palmier",
+  "Riyad",
+  "Bernoussi",
+  "Hay Mohammadi",
+  "Mers Sultan",
+  "Habbous",
+  "Nour",
+  "Val Fleuri",
+];
+
+const cityQuartiers: Record<string, string[]> = {
+  Casablanca: ["Maarif", "Anfa", "Ain Diab", "Sidi Maârouf", "Bourgogne", "Hay Hassani", "Sidi Bernoussi"],
+  Fès: ["Fès El Bali", "Fès Jdid", "Agdal", "Zouagha", "Narjiss", "Route d'Imouzzer", "Saiss"],
+  Tanger: ["Malabata", "Iberia", "Marshan", "Beni Makada", "Mghogha", "Centre-ville", "Branes"],
+  Marrakech: ["Guéliz", "Hivernage", "Médina", "Sidi Youssef Ben Ali (SYBA)", "Daoudiate", "Targa", "Massira"],
+  Salé: ["Tabriquet", "Bettana", "Hay Salam", "Sala Al Jadida", "Hay Rahma", "Sidi Moussa", "Bab Lamrissa"],
+  Meknès: ["Hamria", "Ville Nouvelle", "Medina", "Toulal", "Sidi Bouzekri", "Marjane", "Borj Moulay Omar"],
+  Oujda: ["Hay Al Qods", "Hay Al Andalous", "Lazaret", "Sidi Yahya", "Hay Ennour", "Centre-ville", "Hay El Fath"],
+  Rabat: ["Agdal", "Hassan", "Hay Riad", "Yacoub El Mansour", "Souissi", "Océan", "Akkari"],
+  Agadir: ["Talborjt", "Founty", "Hay Mohammadi", "Dakhla", "Charaf", "Bensergao", "Anza"],
+  Kénitra: ["Maamora", "La Ville Haute", "Mimosas", "Bir Rami", "El Haddada", "Saknia", "Val Fleuri"],
+};
+
+const statusOptions = [
+  "Livré",
+  "En cours de livraison/construction",
+];
+
+const formatDate = (date: Date) => {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, "0");
+  const d = `${date.getDate()}`.padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+
+const monthNames = [
+  "Janvier",
+  "Février",
+  "Mars",
+  "Avril",
+  "Mai",
+  "Juin",
+  "Juillet",
+  "Août",
+  "Septembre",
+  "Octobre",
+  "Novembre",
+  "Décembre",
+];
+
+const getCalendarMatrix = (date: Date) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const rows: Array<Array<Date | null>> = [];
+  let currentDay = 1;
+
+  for (let row = 0; row < 6; row += 1) {
+    const week: Array<Date | null> = [];
+    for (let col = 0; col < 7; col += 1) {
+      if (row === 0 && col < firstDay) {
+        week.push(null);
+      } else if (currentDay > daysInMonth) {
+        week.push(null);
+      } else {
+        week.push(new Date(year, month, currentDay));
+        currentDay += 1;
+      }
+    }
+    rows.push(week);
+  }
+  return rows;
+};
+
+const cleanupPercentValue = (text: string) => {
+  const cleaned = text.replace(/[^0-9.]/g, "");
+  const parts = cleaned.split(".");
+  if (parts.length <= 2) return cleaned;
+  return `${parts[0]}.${parts.slice(1).join("")}`;
+};
+
+const filterSuggestions = (value: string, list: string[]) => {
+  const query = value.trim().toLowerCase();
+  if (!query) return list;
+  return list.filter((item) => item.toLowerCase().startsWith(query));
+};
+
 // Fonction de conversion de surfaces
 const convertSurface = (value: string, fromUnit: string, toUnit: string): string => {
   if (!value || isNaN(parseFloat(value))) return "";
@@ -88,6 +258,13 @@ export default function AddProjectScreen() {
   const [quartier, setQuartier] = useState("");
   const [developer, setDeveloper] = useState("");
   const [status, setStatus] = useState("");
+  const [showStatusSuggestions, setShowStatusSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState<"city" | "quartier" | null>(null);
+  const [showDeliveryDatePicker, setShowDeliveryDatePicker] = useState(false);
+  const [showStartCommercialDatePicker, setShowStartCommercialDatePicker] = useState(false);
+  const [deliveryDateObj, setDeliveryDateObj] = useState<Date | null>(null);
+  const [startCommercialDateObj, setStartCommercialDateObj] = useState<Date | null>(null);
+  const [activeCalendar, setActiveCalendar] = useState<"delivery" | "start" | null>(null);
 
   // --- Surfaces Foncières ---
   const [surfaceFonciereTotal, setSurfaceFonciereTotal] = useState("");
@@ -306,6 +483,56 @@ export default function AddProjectScreen() {
   // Fonction pour obtenir les typologies disponibles
   const getTypologiesForCategory = (category: string): string[] => {
     return typologiesOptions[category as keyof typeof typologiesOptions] || [];
+  };
+
+  const getCitySuggestions = () => filterSuggestions(city, moroccoCities);
+  const getQuartierSuggestions = () => {
+    const cityKey = moroccoCities.find((item) => item.toLowerCase() === city.trim().toLowerCase());
+    const quartierList = cityKey ? cityQuartiers[cityKey] ?? neighbourhoodOptions : neighbourhoodOptions;
+    return filterSuggestions(quartier, quartierList);
+  };
+  const getStatusSuggestions = () => filterSuggestions(status, statusOptions);
+
+  const onSelectCity = (value: string) => {
+    setCity(value);
+    setActiveSuggestion(null);
+  };
+
+  const onSelectQuartier = (value: string) => {
+    setQuartier(value);
+    setActiveSuggestion(null);
+  };
+
+  const onSelectStatus = (value: string) => {
+    setStatus(value);
+    setShowStatusSuggestions(false);
+  };
+
+  const getCalendarRows = (date: Date) => getCalendarMatrix(date);
+
+  const changeCalendarMonth = (type: "delivery" | "start", delta: number) => {
+    if (type === "delivery") {
+      const current = deliveryDateObj || new Date();
+      setDeliveryDateObj(new Date(current.getFullYear(), current.getMonth() + delta, 1));
+    } else {
+      const current = startCommercialDateObj || new Date();
+      setStartCommercialDateObj(new Date(current.getFullYear(), current.getMonth() + delta, 1));
+    }
+  };
+
+  const onCalendarDateSelect = (type: "delivery" | "start", date: Date) => {
+    const value = formatDate(date);
+    if (type === "delivery") {
+      setDeliveryDateObj(date);
+      setDeliveryDate(value);
+      setShowDeliveryDatePicker(false);
+      setActiveCalendar(null);
+    } else {
+      setStartCommercialDateObj(date);
+      setStartCommercialDate(value);
+      setShowStartCommercialDatePicker(false);
+      setActiveCalendar(null);
+    }
   };
 
   const categories = getProjectCategories();
@@ -711,9 +938,72 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
 
           <Text style={styles.projectType}>Type : <Text style={{ fontWeight: "700", color: AppColors.accent }}>{projectType}</Text></Text>
 
-          <TextInput placeholder="Nom du projet" style={styles.input} onChangeText={setName} />
-          <TextInput placeholder="Ville" style={styles.input} onChangeText={setCity} />
-          <TextInput placeholder="Quartier" style={styles.input} onChangeText={setQuartier} />
+          <TextInput
+            placeholder="Nom du projet"
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+          />
+          <View style={{ position: "relative" }}>
+            <TextInput
+              placeholder="Ville"
+              style={styles.input}
+              value={city}
+              onChangeText={(text) => {
+                setCity(text);
+                setActiveSuggestion("city");
+              }}
+              onFocus={() => setActiveSuggestion("city")}
+            />
+            {activeSuggestion === "city" && getCitySuggestions().length > 0 && (
+              <ScrollView
+                style={styles.suggestionsContainer}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.suggestionsContent}
+              >
+                {getCitySuggestions().map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.suggestionItem}
+                    onPress={() => onSelectCity(item)}
+                  >
+                    <Text style={styles.suggestionText}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+          <View style={{ position: "relative" }}>
+            <TextInput
+              placeholder="Quartier"
+              style={styles.input}
+              value={quartier}
+              onChangeText={(text) => {
+                setQuartier(text);
+                setActiveSuggestion("quartier");
+              }}
+              onFocus={() => setActiveSuggestion("quartier")}
+            />
+            {activeSuggestion === "quartier" && getQuartierSuggestions().length > 0 && (
+              <ScrollView
+                style={styles.suggestionsContainer}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.suggestionsContent}
+              >
+                {getQuartierSuggestions().map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.suggestionItem}
+                    onPress={() => onSelectQuartier(item)}
+                  >
+                    <Text style={styles.suggestionText}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
           <TextInput placeholder="Développeur" style={styles.input} onChangeText={setDeveloper} />
 
           {/* Surfaces Foncières */}
@@ -826,20 +1116,141 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             />
           )}
 
-          <TextInput placeholder="Statut" style={styles.input} onChangeText={setStatus} />
+          <View style={{ position: "relative" }}>
+            <TextInput
+              placeholder="Statut"
+              style={styles.input}
+              value={status}
+              onChangeText={(text) => {
+                setStatus(text);
+                setShowStatusSuggestions(true);
+              }}
+              onFocus={() => setShowStatusSuggestions(true)}
+            />
+            {showStatusSuggestions && getStatusSuggestions().length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {getStatusSuggestions().map((item) => (
+                  <TouchableOpacity
+                    key={item}
+                    style={styles.suggestionItem}
+                    onPress={() => onSelectStatus(item)}
+                  >
+                    <Text style={styles.suggestionText}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
 
           {/* Dates */}
-          <TextInput
-            placeholder="Date livraison (YYYY-MM-DD)"
+          <TouchableOpacity
             style={styles.input}
-            onChangeText={setDeliveryDate}
-          />
+            activeOpacity={0.8}
+            onPress={() => {
+              setShowDeliveryDatePicker(true);
+              setActiveCalendar("delivery");
+              if (!deliveryDateObj) setDeliveryDateObj(new Date());
+            }}
+          >
+            <Text style={[styles.dateInputText, !deliveryDate && styles.placeholderText]}>
+              {deliveryDate || "Date livraison"}
+            </Text>
+          </TouchableOpacity>
 
-          <TextInput
-            placeholder="Début commercialisation"
+          <TouchableOpacity
             style={styles.input}
-            onChangeText={setStartCommercialDate}
-          />
+            activeOpacity={0.8}
+            onPress={() => {
+              setShowStartCommercialDatePicker(true);
+              setActiveCalendar("start");
+              if (!startCommercialDateObj) setStartCommercialDateObj(new Date());
+            }}
+          >
+            <Text style={[styles.dateInputText, !startCommercialDate && styles.placeholderText]}>
+              {startCommercialDate || "Début commercialisation"}
+            </Text>
+          </TouchableOpacity>
+
+          {(showDeliveryDatePicker || showStartCommercialDatePicker) && (
+            <Modal transparent animationType="fade">
+              <View style={styles.calendarModalOverlay}>
+                <View style={styles.calendarModal}>
+                  <View style={styles.calendarHeader}>
+                    <TouchableOpacity
+                      style={styles.calendarNavButton}
+                      onPress={() => {
+                        if (activeCalendar === "delivery") changeCalendarMonth("delivery", -1);
+                        else changeCalendarMonth("start", -1);
+                      }}
+                    >
+                      <Text style={styles.calendarNavButtonText}>{"<"}</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.calendarTitle}>
+                      {activeCalendar === "delivery"
+                        ? `${monthNames[(deliveryDateObj || new Date()).getMonth()]} ${(deliveryDateObj || new Date()).getFullYear()}`
+                        : `${monthNames[(startCommercialDateObj || new Date()).getMonth()]} ${(startCommercialDateObj || new Date()).getFullYear()}`}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.calendarNavButton}
+                      onPress={() => {
+                        if (activeCalendar === "delivery") changeCalendarMonth("delivery", 1);
+                        else changeCalendarMonth("start", 1);
+                      }}
+                    >
+                      <Text style={styles.calendarNavButtonText}>{">"}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.calendarWeekRow}>
+                    {['D','L','M','M','J','V','S'].map((weekday, idx) => (
+                      <Text key={`${weekday}-${idx}`} style={styles.calendarWeekDay}>
+                        {weekday}
+                      </Text>
+                    ))}
+                  </View>
+
+                  {(activeCalendar === "delivery" ? getCalendarRows(deliveryDateObj || new Date()) : getCalendarRows(startCommercialDateObj || new Date())).map((week, weekIndex) => (
+                    <View key={weekIndex} style={styles.calendarRow}>
+                      {week.map((day, dayIndex) => {
+                        const isSelected = day
+                          ? (activeCalendar === "delivery"
+                              ? deliveryDate === formatDate(day)
+                              : startCommercialDate === formatDate(day))
+                          : false;
+                        return (
+                          <TouchableOpacity
+                            key={dayIndex}
+                            style={[
+                              styles.calendarDay,
+                              isSelected && styles.calendarDaySelected,
+                              !day && styles.calendarDayEmpty,
+                            ]}
+                            disabled={!day}
+                            onPress={() => day && onCalendarDateSelect(activeCalendar || "delivery", day)}
+                          >
+                            <Text style={[styles.calendarDayText, isSelected && styles.calendarDayTextSelected]}>
+                              {day ? day.getDate() : ''}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ))}
+
+                  <TouchableOpacity
+                    style={styles.calendarCloseButton}
+                    onPress={() => {
+                      setShowDeliveryDatePicker(false);
+                      setShowStartCommercialDatePicker(false);
+                      setActiveCalendar(null);
+                    }}
+                  >
+                    <Text style={styles.calendarCloseButtonText}>Fermer</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Modal>
+          )}
 
           {/* Commercialisation */}
           <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
@@ -847,32 +1258,40 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           </ThemedText>
 
           <TextInput
-            placeholder="Taux commercialisation global %"
+            placeholder="Taux commercialisation global"
             style={styles.input}
-            onChangeText={setCommercializationRateGlobal}
+            value={commercializationRateGlobal ? `${commercializationRateGlobal}%` : ""}
+            onChangeText={(text) => setCommercializationRateGlobal(cleanupPercentValue(text))}
+            keyboardType="numeric"
           />
 
           {isMixedProject && categories.includes("Collectif") && (
             <TextInput
-              placeholder="Taux commercialisation Collectif %"
+              placeholder="Taux commercialisation Collectif"
               style={styles.input}
-              onChangeText={setCommercializationRateCollectif}
+              value={commercializationRateCollectif ? `${commercializationRateCollectif}%` : ""}
+              onChangeText={(text) => setCommercializationRateCollectif(cleanupPercentValue(text))}
+              keyboardType="numeric"
             />
           )}
 
           {isMixedProject && categories.includes("Villa") && (
             <TextInput
-              placeholder="Taux commercialisation Villa %"
+              placeholder="Taux commercialisation Villa"
               style={styles.input}
-              onChangeText={setCommercializationRateVilla}
+              value={commercializationRateVilla ? `${commercializationRateVilla}%` : ""}
+              onChangeText={(text) => setCommercializationRateVilla(cleanupPercentValue(text))}
+              keyboardType="numeric"
             />
           )}
 
           {isMixedProject && categories.includes("Lot de villas") && (
             <TextInput
-              placeholder="Taux commercialisation Lot de villas %"
+              placeholder="Taux commercialisation Lot de villas"
               style={styles.input}
-              onChangeText={setCommercializationRateVillaLot}
+              value={commercializationRateVillaLot ? `${commercializationRateVillaLot}%` : ""}
+              onChangeText={(text) => setCommercializationRateVillaLot(cleanupPercentValue(text))}
+              keyboardType="numeric"
             />
           )}
 
@@ -1623,5 +2042,145 @@ const styles = StyleSheet.create({
   locationResultSubtitle: {
     color: AppColors.gray.dark,
     fontSize: 12,
+  },
+
+  suggestionsContainer: {
+    position: "absolute",
+    top: 56,
+    left: 0,
+    right: 0,
+    backgroundColor: AppColors.ui.background,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    borderRadius: 10,
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 5,
+    maxHeight: 220,
+  },
+
+  suggestionsContent: {
+    paddingBottom: 8,
+  },
+
+  suggestionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderColor: AppColors.gray.lighter,
+  },
+
+  suggestionText: {
+    color: AppColors.ui.text,
+    fontSize: 14,
+  },
+
+  dateInputText: {
+    color: AppColors.ui.text,
+    fontSize: 16,
+  },
+
+  placeholderText: {
+    color: AppColors.gray.dark,
+  },
+
+  calendarModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+
+  calendarModal: {
+    width: "100%",
+    maxWidth: 360,
+    backgroundColor: AppColors.ui.background,
+    borderRadius: 16,
+    padding: 16,
+  },
+
+  calendarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+
+  calendarNavButton: {
+    padding: 10,
+  },
+
+  calendarNavButtonText: {
+    color: AppColors.primary.main,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+
+  calendarTitle: {
+    color: AppColors.primary.main,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  calendarWeekRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
+  calendarWeekDay: {
+    width: 40,
+    textAlign: "center",
+    color: AppColors.gray.dark,
+    fontWeight: "700",
+  },
+
+  calendarRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+
+  calendarDay: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  calendarDayEmpty: {
+    opacity: 0,
+  },
+
+  calendarDaySelected: {
+    backgroundColor: AppColors.primary.main,
+  },
+
+  calendarDayText: {
+    color: AppColors.ui.text,
+  },
+
+  calendarDayTextSelected: {
+    color: AppColors.ui.background,
+    fontWeight: "700",
+  },
+
+  calendarCloseButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: AppColors.primary.main,
+    alignItems: "center",
+  },
+
+  calendarCloseButtonText: {
+    color: AppColors.ui.background,
+    fontSize: 16,
+    fontWeight: "700",
   },
 });
