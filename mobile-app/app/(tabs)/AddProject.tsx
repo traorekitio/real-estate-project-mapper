@@ -1,6 +1,6 @@
 // mobile-app/app/(tabs)/AddProject.tsx
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   TextInput,
@@ -12,9 +12,10 @@ import {
   Modal,
   TouchableOpacity,
   Text,
+  ActivityIndicator,
 } from "react-native";
 import MapView, { Marker } from "react-native-maps";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { OpenLocationCode } from "open-location-code";
 
 import { supabase } from "@/lib/supabase";
@@ -129,21 +130,118 @@ const neighbourhoodOptions = [
 ];
 
 const cityQuartiers: Record<string, string[]> = {
-  Casablanca: ["Maarif", "Anfa", "Ain Diab", "Sidi Maârouf", "Bourgogne", "Hay Hassani", "Sidi Bernoussi"],
-  Fès: ["Fès El Bali", "Fès Jdid", "Agdal", "Zouagha", "Narjiss", "Route d'Imouzzer", "Saiss"],
-  Tanger: ["Malabata", "Iberia", "Marshan", "Beni Makada", "Mghogha", "Centre-ville", "Branes"],
-  Marrakech: ["Guéliz", "Hivernage", "Médina", "Sidi Youssef Ben Ali (SYBA)", "Daoudiate", "Targa", "Massira"],
-  Salé: ["Tabriquet", "Bettana", "Hay Salam", "Sala Al Jadida", "Hay Rahma", "Sidi Moussa", "Bab Lamrissa"],
-  Meknès: ["Hamria", "Ville Nouvelle", "Medina", "Toulal", "Sidi Bouzekri", "Marjane", "Borj Moulay Omar"],
+  Agadir: ["Talborjt", "Founty", "Hay Mohammadi", "Dakhla", "Charaf", "Bensergao", "Anza", "Tikiouine", "Al Massira"],
+  Ahfir: ["Centre-ville", "Hay Khattab", "Oulad El Mokhtar", "Hay Al Fath"],
+  "Aït Melloul": ["Al Massira 1", "Al Massira 2", "Mhamid", "Bouregreg"],
+  "Al Hoceïma": ["Boulevard Mohamed V", "Ben Ziane", "Tanger", "Boulevard Abdelkrim El Khattabi", "Boinsouda"],
+  Asilah: ["Medina", "Quat", "Boulevard", "Bab al Bahr"],
+  Azemmour: ["Quartier du Port", "Sidi Ibrahim", "Saada", "La Kasbah"],
+  Azrou: ["Hay Rimal", "Bizerte", "Taddart", "El Mansour"],
+  "Béni Mellal": ["Ain Asserdoun", "Sidi Rahal", "Hay Hamdouch", "Oued Zem"],
+  Berkane: ["Hay Mohammadi", "Cité Saiada", "Boulevard Mohamed V", "Oued Zegzoug"],
+  Berrechid: ["Hay Nahda", "Hay Salam", "Cité Al Amal", "Centre-ville"],
+  Bouarfa: ["Hay Mohammadi", "Quartier Industriel", "Ouled El Habib"],
+  Bouskoura: ["Bouskoura City", "Emaar", "Palmier", "Canal"],
+  Bouznika: ["Plage", "Quartier Résidentiel", "Hay Al Bahr"],
+  Casablanca: ["Maarif", "Anfa", "Ain Diab", "Sidi Maârouf", "Bourgogne", "Hay Hassani", "Sidi Bernoussi", "Gauthier", "Habbous", "Sidi Belyout", "Ain Sebaa", "Hay Mohammadi", "Racine", "Derb Omar"],
+  Chefchaouen: ["Medina", "Bab Souk", "Kasbah", "Ouazzane", "Bab El Ansar"],
+  Chichaoua: ["Centre-ville", "Hay Anfa", "Ain Zaalan"],
+  Dakhla: ["Quartier Administratif", "Al Massira", "Hay Al Bahr", "Oued Eddahab"],
+  "El Hajeb": ["Centre-ville", "Hay Rachad", "El Maârif"],
+  "El Jadida": ["Quartier du Stade", "Ksar", "Boulevard Mohammed V", "Al Massira"],
+  Errachidia: ["Hay Mohamed V", "Les Américains", "Oued Ziz", "Centre-ville"],
+  Essaouira: ["Medina", "Quartier des Pêcheurs", "Laksar", "Mellah"],
+  Fès: ["Fès El Bali", "Fès Jdid", "Agdal", "Zouagha", "Narjiss", "Route d'Imouzzer", "Saiss", "Mellah", "Ain Azliten"],
+  Fnideq: ["Malabata", "Bab Sebta", "Cité Jidar", "Sidi Bouzid"],
+  Guelmim: ["Hay Tiout", "Boulevard Abdelkrim", "Mohammed V", "El Ksar"],
+  Ifrane: ["Quartier universitaire", "Al Atlas", "Azrou", "Moulay Rachid"],
+  Jerada: ["Quartier Industriel", "Oued El Arab", "Hay Ennakhil"],
+  "Kénitra": ["Maamora", "La Ville Haute", "Mimosas", "Bir Rami", "El Haddada", "Saknia", "Val Fleuri", "Hay Al Qods"],
+  Khemisset: ["Boulevard Mohamed V", "Hay Al Mahrouss", "Cité Moulay Rachid"],
+  "Khémis Zemamra": ["Hay Lahrir", "Quartier Industriel", "Oued Zem"],
+  Khénifra: ["Ville Nouvelle", "Oued El Abid", "Hay Riad"],
+  Khouribga: ["Hay Al Salam", "Cité Mouvements", "Oued El Arab"],
+  "Ksar El Kébir": ["Quartier El Mansour", "Diego Suarez", "Hay Salam"],
+  "Laâyoune": ["Hay Al Massira", "Hay Salam", "Boulevard Hassan II", "Quartier Administratif"],
+  Larache: ["Hay El Jadida", "Centre-ville", "Oued El Makhazine"],
+  Martil: ["Corniche", "Quartier Portuaire", "Hay Salam"],
+  Marrakech: ["Guéliz", "Hivernage", "Médina", "Sidi Youssef Ben Ali (SYBA)", "Daoudiate", "Targa", "Massira", "Sidi Ghanem", "Palmeraie", "Bab Doukkala"],
+  "Mechra Bel Ksiri": ["Quartier Agricole", "Cité Moussa", "Souk"],
+  Midelt: ["Hay Al Amal", "Quartier Ouest", "Hay Rissani"],
+  "Mohammédia": ["Centre-ville", "Sidi Moussa", "Hay Mohammadi", "Cité Galilée"],
+  Nador: ["Souk Ziraoui", "Hay Salam", "Beni Roumman", "Cité Al Wifaq"],
+  "Ouarzazate": ["Village des Arts", "Hay Laksour", "Cité Al Atlas"],
+  Ouezzane: ["Quartier Andalou", "Hay Riad", "Centre-ville"],
   Oujda: ["Hay Al Qods", "Hay Al Andalous", "Lazaret", "Sidi Yahya", "Hay Ennour", "Centre-ville", "Hay El Fath"],
-  Rabat: ["Agdal", "Hassan", "Hay Riad", "Yacoub El Mansour", "Souissi", "Océan", "Akkari"],
-  Agadir: ["Talborjt", "Founty", "Hay Mohammadi", "Dakhla", "Charaf", "Bensergao", "Anza"],
-  Kénitra: ["Maamora", "La Ville Haute", "Mimosas", "Bir Rami", "El Haddada", "Saknia", "Val Fleuri"],
+  Rabat: ["Agdal", "Hassan", "Hay Riad", "Yacoub El Mansour", "Souissi", "Océan", "Akkari", "Quartier des Orangers"],
+  Safi: ["Quartier Industriel", "Hay Al Hssaine", "Jadida", "Cité Saïd"],
+  Salé: ["Tabriquet", "Bettana", "Hay Salam", "Sala Al Jadida", "Hay Rahma", "Sidi Moussa", "Bab Lamrissa"],
+  Sefrou: ["Bab El Qebbour", "Cité Al Qods", "Hay Moulay Rachid"],
+  Settat: ["Quartier du Stade", "Hay Fokhar", "Ain Noujoum"],
+  "Sidi Bennour": ["Hay El Basma", "Centre-ville"],
+  "Sidi Ifni": ["La Plage", "Cité Nelson Mandela"],
+  "Sidi Kacem": ["Hay El Hana", "Quartier Industriel"],
+  "Sidi Slimane": ["Hay Riad", "Centre-ville"],
+  Skhirat: ["Plage", "Cité Sea Golf", "Hay Al Amal"],
+  "Souk El Arbaa": ["Hay Ennakhil", "Quartier du Souk"],
+  Taounate: ["Hay Souani", "Cité Administrative"],
+  Tarfaya: ["Corniche", "Hay Al Matar"],
+  Taroudant: ["Hay El Wadi", "Quartier Souk", "Cité Al Wifaq"],
+  Taourirt: ["Quartier des Princes", "Hay Al Khair"],
+  Taza: ["Quartier Boulevard", "Hay El Irfane", "Centre-ville"],
+  Témara: ["Boukhalef", "Riad Salam", "Founty"],
+  "Tétouan": ["Martil", "Fnideq", "Quartier Andalou", "Boulevard Hassan II"],
+  Tinghir: ["Hay El Matar", "Cité Ouarzazate"],
+  Tiznit: ["Quartier des Artisans", "Hay Al Amal", "Cité Saada"],
+  Youssoufia: ["Quartier Industriel", "Hay Al Massira"],
+  Zagora: ["Quartier du Souk", "Boulevard Hassan II"],
+  Autre: ["Centre-ville", "Quartier Administratif", "Hay Riad", "Ville Nouvelle"],
 };
 
 const statusOptions = [
   "Livré",
   "En cours de livraison/construction",
+];
+
+const residentialAmenitiesOptions = [
+  "Piscine",
+  "Salle de sport",
+  "Jardin",
+  "Sécurité 24/7",
+  "Parking",
+  "Club enfant",
+];
+
+const projectComponentsOptions = [
+  "Résidentiel",
+  "Commerces",
+  "Bureaux",
+  "Hôtel",
+  "Espaces verts",
+  "Parking",
+  "Loisirs",
+];
+
+const toggleSelection = (
+  option: string,
+  selected: string[],
+  setSelected: React.Dispatch<React.SetStateAction<string[]>>
+) => {
+  if (selected.includes(option)) {
+    setSelected(selected.filter((item) => item !== option));
+  } else {
+    setSelected([...selected, option]);
+  }
+};
+
+const businessModelOptions = ["vente", "location", "mixte vente-location", "autre"];
+const standingOptions = [
+  "economique",
+  "moyen de gamme",
+  "moyen de gamme +",
+  "haut de gamme",
+  "haut de gamme +",
+  "premium",
 ];
 
 const formatDate = (date: Date) => {
@@ -246,8 +344,12 @@ const toggleSurfaceUnit = (
 
 export default function AddProjectScreen() {
   const router = useRouter();
+  const { projectId } = useLocalSearchParams<{ projectId?: string }>();
 
-  const [showMainTypeModal, setShowMainTypeModal] = useState(true);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isLoadingProject, setIsLoadingProject] = useState(false);
+  const [showMainTypeModal, setShowMainTypeModal] = useState(!projectId);
   const [showMixedTypeModal, setShowMixedTypeModal] = useState(false);
   const [projectType, setProjectType] = useState("");
   const [mapType, setMapType] = useState<"standard" | "satellite" | "terrain">("standard");
@@ -309,6 +411,9 @@ export default function AddProjectScreen() {
   const [surfaceTerrasseMax, setSurfaceTerrasseMax] = useState("");
   const [surfaceTerrainMin, setSurfaceTerrainMin] = useState("");
   const [surfaceTerrainMax, setSurfaceTerrainMax] = useState("");
+  const [cusTypology, setCusTypology] = useState("");
+  const [cosTypology, setCosTypology] = useState("");
+  const [hauteurTypology, setHauteurTypology] = useState("");
   const [pricingMode, setPricingMode] = useState<"from" | "between">("from");
   const [pricingMin, setPricingMin] = useState("");
   const [pricingMax, setPricingMax] = useState("");
@@ -316,6 +421,13 @@ export default function AddProjectScreen() {
   const [pricingComment, setPricingComment] = useState("");
   const [units, setUnits] = useState("");
   const [typologiesList, setTypologiesList] = useState<any[]>([]);
+  const [standingCible, setStandingCible] = useState("");
+  const [amenities, setAmenities] = useState<string[]>([]);
+  const [amenitiesCustom, setAmenitiesCustom] = useState("");
+  const [projectComponents, setProjectComponents] = useState<string[]>([]);
+  const [projectComponentsCustom, setProjectComponentsCustom] = useState("");
+  const [businessModel, setBusinessModel] = useState("");
+  const [businessModelCustom, setBusinessModelCustom] = useState("");
 
   // --- Localisation ---
   const [locationQuery, setLocationQuery] = useState("");
@@ -356,7 +468,11 @@ export default function AddProjectScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // Réinitialiser TOUS les champs
+      if (projectId) {
+        return;
+      }
+
+      // Réinitialiser TOUS les champs pour un nouveau projet
       setShowMainTypeModal(true);
       setShowMixedTypeModal(false);
       setProjectType("");
@@ -424,7 +540,16 @@ export default function AddProjectScreen() {
       setPricingUnit("MMAD");
       setPricingComment("");
       setUnits("");
+      setCusTypology("");
+      setCosTypology("");
+      setHauteurTypology("");
       setTypologiesList([]);
+      setStandingCible("");
+      setAmenities([]);
+      setAmenitiesCustom("");
+      setProjectComponents([]);
+      setProjectComponentsCustom("");
+      setBusinessModel("");
       
       // Densité
       setDensityGlobal("");
@@ -442,7 +567,7 @@ export default function AddProjectScreen() {
       // Map
       setLatitude(null);
       setLongitude(null);
-    }, [])
+    }, [projectId])
   );
 
   const selectMainType = (type: string) => {
@@ -498,6 +623,142 @@ export default function AddProjectScreen() {
     setActiveSuggestion(null);
   };
 
+  const loadProjectForEdit = async (id: string) => {
+    setIsLoadingProject(true);
+    try {
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (projectError || !projectData) {
+        console.error("Erreur chargement projet", projectError);
+        Alert.alert("Erreur", "Impossible de charger le projet.");
+        return;
+      }
+
+      setEditingProjectId(id);
+      setIsEditMode(true);
+      setShowMainTypeModal(false);
+      setShowMixedTypeModal(false);
+      setProjectType(projectData.project_type || "");
+      setName(projectData.name || "");
+      setCity(projectData.city || "");
+      setQuartier(projectData.quartier || "");
+      setDeveloper(projectData.developer || "");
+      setStatus(projectData.status || "");
+      setStandingCible(projectData.standing_cible || "");
+      setBusinessModel(projectData.business_model || "");
+      setAmenities(projectData.amenities || []);
+      setProjectComponents(projectData.project_components || []);
+      setSurfaceFonciereTotal(projectData.surface_fonciere_totale?.toString() || "");
+      setSurfaceFonciereCollectif(projectData.surface_fonciere_collectif?.toString() || "");
+      setSurfaceFonciereVilla(projectData.surface_fonciere_villa?.toString() || "");
+      setSurfaceFonciereVillaLot(projectData.surface_fonciere_lot_villas?.toString() || "");
+      setTotalUnitsGlobal(projectData.total_units?.toString() || "");
+      setTotalUnitsCollectif(projectData.total_units_collectif?.toString() || "");
+      setTotalUnitsVilla(projectData.total_units_villa?.toString() || "");
+      setTotalUnitsVillaLot(projectData.total_units_lot_villas?.toString() || "");
+      setDeliveryDate(projectData.delivery_date || "");
+      setStartCommercialDate(projectData.start_commercial_date || "");
+      setCommercializationRateGlobal(projectData.commercialization_rate_global?.toString() || "");
+      setCommercializationRateCollectif(projectData.commercialization_rate_collectif?.toString() || "");
+      setCommercializationRateVilla(projectData.commercialization_rate_villa?.toString() || "");
+      setCommercializationRateVillaLot(projectData.commercialization_rate_lot_villas?.toString() || "");
+      setSalesVelocityGlobal(projectData.sales_velocity_global?.toString() || "");
+      setSalesVelocityCollectif(projectData.sales_velocity_collectif?.toString() || "");
+      setSalesVelocityVilla(projectData.sales_velocity_villa?.toString() || "");
+      setSalesVelocityVillaLot(projectData.sales_velocity_lot_villas?.toString() || "");
+      setUnitsRemainingGlobal(projectData.units_remaining_global?.toString() || "");
+      setUnitsRemainingCollectif(projectData.units_remaining_collectif?.toString() || "");
+      setUnitsRemainingVilla(projectData.units_remaining_villa?.toString() || "");
+      setUnitsRemainingVillaLot(projectData.units_remaining_lot_villas?.toString() || "");
+      setLatitude(projectData.latitude ?? null);
+      setLongitude(projectData.longitude ?? null);
+      setMapRegion({
+        latitude: projectData.latitude || 33.5731,
+        longitude: projectData.longitude || -7.5898,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+
+      const { data: typologiesData, error: typologiesError } = await supabase
+        .from("projects_typologies")
+        .select("*")
+        .eq("project_id", id);
+
+      if (typologiesError) {
+        console.error("Erreur chargement typologies", typologiesError);
+      } else {
+        setTypologiesList(
+          typologiesData?.map((t: any) => ({
+            typology_category: t.typology_category,
+            typology: t.typology,
+            surfaceHabitableMin: t.surface_habitable_min?.toString() || "",
+            surfaceHabitableMax: t.surface_habitable_max?.toString() || "",
+            surfaceTerrasseMin: t.surface_terrasse_min?.toString() || "",
+            surfaceTerrasseMax: t.surface_terrasse_max?.toString() || "",
+            surfaceTerrainMin: t.surface_terrain_min?.toString() || "",
+            surfaceTerrainMax: t.surface_terrain_max?.toString() || "",
+            cus: t.cus?.toString() || "",
+            cos: t.cos?.toString() || "",
+            hauteur: t.hauteur || "",
+            pricingMode: t.pricing_type || "from",
+            pricingMin: t.pricing_min?.toString() || "",
+            pricingMax: t.pricing_max?.toString() || "",
+            pricingUnit: t.pricing_unit || "MMAD",
+            pricingComment: t.pricing_comment || "",
+            units: t.units?.toString() || "",
+          })) || []
+        );
+      }
+
+      const { data: densityData, error: densityError } = await supabase
+        .from("projects_density")
+        .select("*")
+        .eq("project_id", id);
+
+      if (!densityError && densityData) {
+        const densityGlobalRow = densityData.find((row: any) => row.category === "global" && row.density_type === "density");
+        const densityCollectifRow = densityData.find((row: any) => row.category === "Collectif");
+        const densityVillaRow = densityData.find((row: any) => row.category === "Villa");
+        const densityLotRow = densityData.find((row: any) => row.category === "Lot de villas");
+        const cusRow = densityData.find((row: any) => row.density_type === "CUS");
+
+        setDensityGlobal(densityGlobalRow?.density_value?.toString() || "");
+        setDensityCollectif(densityCollectifRow?.density_value?.toString() || "");
+        setDensityVilla(densityVillaRow?.density_value?.toString() || "");
+        setDensityVillaLot(densityLotRow?.density_value?.toString() || "");
+        setCus(cusRow?.density_value?.toString() || "");
+      }
+
+      const { data: retailData, error: retailError } = await supabase
+        .from("projects_retail")
+        .select("*")
+        .eq("project_id", id)
+        .single();
+
+      if (!retailError && retailData) {
+        setGla(retailData.gla?.toString() || "");
+        setPositionnement(retailData.positionnement || "");
+        setMixRetail(retailData.mix_retail || "");
+        setEnseignes(retailData.enseignes || "");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erreur", "Impossible de charger le projet.");
+    } finally {
+      setIsLoadingProject(false);
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      loadProjectForEdit(projectId);
+    }
+  }, [projectId]);
+
   const onSelectQuartier = (value: string) => {
     setQuartier(value);
     setActiveSuggestion(null);
@@ -507,6 +768,15 @@ export default function AddProjectScreen() {
     setStatus(value);
     setShowStatusSuggestions(false);
   };
+
+  if (projectId && isLoadingProject) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={AppColors.primary.main} />
+        <Text style={styles.loadingText}>Chargement du projet…</Text>
+      </View>
+    );
+  }
 
   const getCalendarRows = (date: Date) => getCalendarMatrix(date);
 
@@ -558,6 +828,9 @@ export default function AddProjectScreen() {
         surfaceTerrasseMax,
         surfaceTerrainMin,
         surfaceTerrainMax,
+        cus: cusTypology,
+        cos: cosTypology,
+        hauteur: hauteurTypology,
         pricingMode,
         pricingMin,
         pricingMax,
@@ -580,12 +853,16 @@ export default function AddProjectScreen() {
     setSurfaceTerrasseMax("");
     setSurfaceTerrainMin("");
     setSurfaceTerrainMax("");
+    setCusTypology("");
+    setCosTypology("");
+    setHauteurTypology("");
     setPricingMode("from");
     setPricingMin("");
     setPricingMax("");
     setPricingUnit("MMAD");
     setPricingComment("");
     setUnits("");
+    setBusinessModelCustom("");
   };
 
   const extractPlusCode = (text: string): string | null => {
@@ -748,149 +1025,175 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
   return numValue; // déjà en m²
 };
 
-  const addProject = async () => {
+  const saveProject = async () => {
     if (!latitude || !longitude) {
       Alert.alert("Erreur", "Place le projet sur la carte");
       return;
     }
 
-    const { data, error } = await supabase
-      .from("projects")
-      .insert([
-        {
-          name,
-          city,
-          quartier,
-          latitude,
-          longitude,
-          developer,
-          project_type: projectType,
-          status,
-          surface_fonciere_totale: convertToM2ForDatabase(surfaceFonciereTotal, unitTotalSurface),
-          surface_fonciere_collectif: convertToM2ForDatabase(surfaceFonciereCollectif, unitCollectifSurface),
-          surface_fonciere_villa: convertToM2ForDatabase(surfaceFonciereVilla, unitVillaSurface),
-          surface_fonciere_lot_villas: convertToM2ForDatabase(surfaceFonciereVillaLot, unitVillaLotSurface),
-          total_units: parseInt(totalUnitsGlobal) || null,
-          total_units_collectif: parseInt(totalUnitsCollectif) || null,
-          total_units_villa: parseInt(totalUnitsVilla) || null,
-          total_units_lot_villas: parseInt(totalUnitsVillaLot) || null,
-          delivery_date: deliveryDate || null,
-          start_commercial_date: startCommercialDate || null,
-          commercialization_rate_global: parseFloat(commercializationRateGlobal) || null,
-          commercialization_rate_collectif: parseFloat(commercializationRateCollectif) || null,
-          commercialization_rate_villa: parseFloat(commercializationRateVilla) || null,
-          commercialization_rate_lot_villas: parseFloat(commercializationRateVillaLot) || null,
-          sales_velocity_global: parseFloat(salesVelocityGlobal) || null,
-          sales_velocity_collectif: parseFloat(salesVelocityCollectif) || null,
-          sales_velocity_villa: parseFloat(salesVelocityVilla) || null,
-          sales_velocity_lot_villas: parseFloat(salesVelocityVillaLot) || null,
-          units_remaining_global: parseInt(unitsRemainingGlobal) || null,
-          units_remaining_collectif: parseInt(unitsRemainingCollectif) || null,
-          units_remaining_villa: parseInt(unitsRemainingVilla) || null,
-          units_remaining_lot_villas: parseInt(unitsRemainingVillaLot) || null,
-        },
-      ])
-      .select();
+    const normalizedAmenities = [...amenities];
+    if (amenitiesCustom.trim()) normalizedAmenities.push(amenitiesCustom.trim());
 
-    if (error) {
-      Alert.alert("Erreur", error.message);
+    const normalizedProjectComponents = [...projectComponents];
+    if (projectComponentsCustom.trim()) normalizedProjectComponents.push(projectComponentsCustom.trim());
+
+    const projectData = {
+      name,
+      city,
+      quartier,
+      latitude,
+      longitude,
+      developer,
+      project_type: projectType,
+      status,
+      standing_cible: standingCible || null,
+      business_model: businessModel === "autre" ? (businessModelCustom || null) : businessModel || null,
+      amenities: normalizedAmenities.length ? normalizedAmenities : null,
+      project_components: normalizedProjectComponents.length ? normalizedProjectComponents : null,
+      surface_fonciere_totale: convertToM2ForDatabase(surfaceFonciereTotal, unitTotalSurface),
+      surface_fonciere_collectif: convertToM2ForDatabase(surfaceFonciereCollectif, unitCollectifSurface),
+      surface_fonciere_villa: convertToM2ForDatabase(surfaceFonciereVilla, unitVillaSurface),
+      surface_fonciere_lot_villas: convertToM2ForDatabase(surfaceFonciereVillaLot, unitVillaLotSurface),
+      total_units: parseInt(totalUnitsGlobal) || null,
+      total_units_collectif: parseInt(totalUnitsCollectif) || null,
+      total_units_villa: parseInt(totalUnitsVilla) || null,
+      total_units_lot_villas: parseInt(totalUnitsVillaLot) || null,
+      delivery_date: deliveryDate || null,
+      start_commercial_date: startCommercialDate || null,
+      commercialization_rate_global: parseFloat(commercializationRateGlobal) || null,
+      commercialization_rate_collectif: parseFloat(commercializationRateCollectif) || null,
+      commercialization_rate_villa: parseFloat(commercializationRateVilla) || null,
+      commercialization_rate_lot_villas: parseFloat(commercializationRateVillaLot) || null,
+      sales_velocity_global: parseFloat(salesVelocityGlobal) || null,
+      sales_velocity_collectif: parseFloat(salesVelocityCollectif) || null,
+      sales_velocity_villa: parseFloat(salesVelocityVilla) || null,
+      sales_velocity_lot_villas: parseFloat(salesVelocityVillaLot) || null,
+      units_remaining_global: parseInt(unitsRemainingGlobal) || null,
+      units_remaining_collectif: parseInt(unitsRemainingCollectif) || null,
+      units_remaining_villa: parseInt(unitsRemainingVilla) || null,
+      units_remaining_lot_villas: parseInt(unitsRemainingVillaLot) || null,
+    };
+
+    let projectIdToUse = editingProjectId;
+    let projectResponse;
+
+    if (isEditMode && editingProjectId) {
+      const { data, error } = await supabase
+        .from("projects")
+        .update(projectData)
+        .eq("id", editingProjectId)
+        .select();
+
+      if (error) {
+        Alert.alert("Erreur", error.message);
+        return;
+      }
+
+      projectResponse = data;
+    } else {
+      const { data, error } = await supabase
+        .from("projects")
+        .insert([projectData])
+        .select();
+
+      if (error) {
+        Alert.alert("Erreur", error.message);
+        return;
+      }
+
+      projectResponse = data;
+      projectIdToUse = (data && data[0]?.id) || null;
+    }
+
+    if (!projectIdToUse) {
+      Alert.alert("Erreur", "Impossible de récupérer l'ID du projet.");
       return;
     }
 
-    const projectId = data[0].id;
-
     // Sauvegarder les typologies
+    await supabase.from("projects_typologies").delete().eq("project_id", projectIdToUse);
     for (let t of typologiesList) {
-      await supabase.from("projects_typologies").insert([
-        {
-          project_id: projectId,
-          typology_category: t.typology_category,
-          typology: t.typology,
-          surface_habitable_min: parseFloat(t.surfaceHabitableMin) || null,
-          surface_habitable_max: parseFloat(t.surfaceHabitableMax) || null,
-          surface_terrasse_min: parseFloat(t.surfaceTerrasseMin) || null,
-          surface_terrasse_max: parseFloat(t.surfaceTerrasseMax) || null,
-          surface_terrain_min: parseFloat(t.surfaceTerrainMin) || null,
-          surface_terrain_max: parseFloat(t.surfaceTerrainMax) || null,
-          pricing_type: t.pricingMode,
-          pricing_min: parseFloat(t.pricingMin) || null,
-          pricing_max: parseFloat(t.pricingMax) || null,
-          pricing_unit: t.pricingUnit || null,
-          pricing_comment: t.pricingComment || null,
-          units: parseInt(t.units) || null,
-        },
-      ]);
+      await supabase.from("projects_typologies").insert([{
+        project_id: projectIdToUse,
+        typology_category: t.typology_category,
+        typology: t.typology,
+        surface_habitable_min: parseFloat(t.surfaceHabitableMin) || null,
+        surface_habitable_max: parseFloat(t.surfaceHabitableMax) || null,
+        surface_terrasse_min: parseFloat(t.surfaceTerrasseMin) || null,
+        surface_terrasse_max: parseFloat(t.surfaceTerrasseMax) || null,
+        surface_terrain_min: parseFloat(t.surfaceTerrainMin) || null,
+        surface_terrain_max: parseFloat(t.surfaceTerrainMax) || null,
+        cus: t.cus ? parseFloat(t.cus) : null,
+        cos: t.cos ? parseFloat(t.cos) : null,
+        hauteur: t.hauteur || null,
+        pricing_type: t.pricingMode,
+        pricing_min: parseFloat(t.pricingMin) || null,
+        pricing_max: parseFloat(t.pricingMax) || null,
+        pricing_unit: t.pricingUnit || null,
+        pricing_comment: t.pricingComment || null,
+        units: parseInt(t.units) || null,
+      }]);
     }
 
-    // Sauvegarder les densités
+    await supabase.from("projects_density").delete().eq("project_id", projectIdToUse);
     if (densityGlobal) {
-      await supabase.from("projects_density").insert([
-        {
-          project_id: projectId,
-          density_type: "density",
-          category: "global",
-          density_value: parseFloat(densityGlobal),
-        },
-      ]);
+      await supabase.from("projects_density").insert([{
+        project_id: projectIdToUse,
+        density_type: "density",
+        category: "global",
+        density_value: parseFloat(densityGlobal),
+      }]);
     }
 
     if (densityCollectif && categories.includes("Collectif")) {
-      await supabase.from("projects_density").insert([
-        {
-          project_id: projectId,
-          density_type: "density",
-          category: "Collectif",
-          density_value: parseFloat(densityCollectif),
-        },
-      ]);
+      await supabase.from("projects_density").insert([{
+        project_id: projectIdToUse,
+        density_type: "density",
+        category: "Collectif",
+        density_value: parseFloat(densityCollectif),
+      }]);
     }
 
     if (densityVilla && categories.includes("Villa")) {
-      await supabase.from("projects_density").insert([
-        {
-          project_id: projectId,
-          density_type: "density",
-          category: "Villa",
-          density_value: parseFloat(densityVilla),
-        },
-      ]);
+      await supabase.from("projects_density").insert([{
+        project_id: projectIdToUse,
+        density_type: "density",
+        category: "Villa",
+        density_value: parseFloat(densityVilla),
+      }]);
     }
 
     if (densityVillaLot && categories.includes("Lot de villas")) {
-      await supabase.from("projects_density").insert([
-        {
-          project_id: projectId,
-          density_type: "density",
-          category: "Lot de villas",
-          density_value: parseFloat(densityVillaLot),
-        },
-      ]);
+      await supabase.from("projects_density").insert([{
+        project_id: projectIdToUse,
+        density_type: "density",
+        category: "Lot de villas",
+        density_value: parseFloat(densityVillaLot),
+      }]);
     }
 
+    await supabase.from("projects_density").delete().eq("project_id", projectIdToUse).eq("density_type", "CUS");
     if (cus && categories.includes("Lot de villas")) {
-      await supabase.from("projects_density").insert([
-        {
-          project_id: projectId,
-          density_type: "CUS",
-          category: "global",
-          density_value: parseFloat(cus),
-        },
-      ]);
+      await supabase.from("projects_density").insert([{
+        project_id: projectIdToUse,
+        density_type: "CUS",
+        category: "global",
+        density_value: parseFloat(cus),
+      }]);
     }
 
     if (projectType === "Retail") {
-      await supabase.from("projects_retail").insert([
-        {
-          project_id: projectId,
-          gla: parseFloat(gla),
-          positionnement,
-          mix_retail: mixRetail,
-          enseignes,
-        },
-      ]);
+      await supabase.from("projects_retail").delete().eq("project_id", projectIdToUse);
+      await supabase.from("projects_retail").insert([{
+        project_id: projectIdToUse,
+        gla: parseFloat(gla),
+        positionnement,
+        mix_retail: mixRetail,
+        enseignes,
+      }]);
     }
 
-    Alert.alert("Succès", "Projet ajouté !");
+    Alert.alert("Succès", isEditMode ? "Projet mis à jour !" : "Projet ajouté !");
     router.replace("/(tabs)/explore");
   };
 
@@ -1005,6 +1308,25 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             )}
           </View>
           <TextInput placeholder="Développeur" style={styles.input} onChangeText={setDeveloper} />
+          <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Standing / cible</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {standingOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: standingCible === opt ? AppColors.primary.main : AppColors.gray.lighter,
+                  backgroundColor: standingCible === opt ? AppColors.primary.light + "30" : AppColors.ui.background,
+                }}
+                onPress={() => setStandingCible(opt)}
+              >
+                <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
           {/* Surfaces Foncières */}
           <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
@@ -1303,14 +1625,16 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           <TextInput
             placeholder="Taux d'écoulement global (unité/mois)"
             style={styles.input}
-            onChangeText={setSalesVelocityGlobal}
+            value={salesVelocityGlobal ? `${salesVelocityGlobal} unité/mois` : ""}
+            onChangeText={(text) => setSalesVelocityGlobal(cleanupPercentValue(text))}
           />
 
           {isMixedProject && categories.includes("Collectif") && (
             <TextInput
               placeholder="Taux d'écoulement Collectif (unité/mois)"
               style={styles.input}
-              onChangeText={setSalesVelocityCollectif}
+              value={salesVelocityCollectif ? `${salesVelocityCollectif} unité/mois` : ""}
+              onChangeText={(text) => setSalesVelocityCollectif(cleanupPercentValue(text))}
             />
           )}
 
@@ -1318,7 +1642,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             <TextInput
               placeholder="Taux d'écoulement Villa (unité/mois)"
               style={styles.input}
-              onChangeText={setSalesVelocityVilla}
+              value={salesVelocityVilla ? `${salesVelocityVilla} unité/mois` : ""}
+              onChangeText={(text) => setSalesVelocityVilla(cleanupPercentValue(text))}
             />
           )}
 
@@ -1326,7 +1651,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             <TextInput
               placeholder="Taux d'écoulement Lot de villas (unité/mois)"
               style={styles.input}
-              onChangeText={setSalesVelocityVillaLot}
+              value={salesVelocityVillaLot ? `${salesVelocityVillaLot} unité/mois` : ""}
+              onChangeText={(text) => setSalesVelocityVillaLot(cleanupPercentValue(text))}
             />
           )}
 
@@ -1470,6 +1796,30 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                 />
               </View>
 
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="CUS"
+                  style={[styles.input, { flex: 1 }]}
+                  value={cusTypology ? `${cusTypology}%` : ""}
+                  onChangeText={(text) => setCusTypology(cleanupPercentValue(text))}
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  placeholder="COS"
+                  style={[styles.input, { flex: 1 }]}
+                  value={cosTypology ? `${cosTypology}%` : ""}
+                  onChangeText={(text) => setCosTypology(cleanupPercentValue(text))}
+                  keyboardType="numeric"
+                />
+              </View>
+              <TextInput
+                placeholder="Hauteur (ex: R+1)"
+                style={[styles.input, { marginBottom: 12 }]}
+                value={hauteurTypology}
+                onChangeText={setHauteurTypology}
+                keyboardType="default"
+              />
+
               <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Prix de vente</Text>
               <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
                 {(["from", "between"] as const).map((mode) => (
@@ -1544,17 +1894,83 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     const priceRange = t.pricingMode === "between"
                       ? `Entre ${t.pricingMin} et ${t.pricingMax} ${t.pricingUnit}`
                       : `À partir de ${t.pricingMin} ${t.pricingUnit}`;
+                    const typologyExtras = [
+                      t.cus ? `CUS: ${t.cus}%` : null,
+                      t.cos ? `COS: ${t.cos}%` : null,
+                      t.hauteur ? `Hauteur: ${t.hauteur}` : null,
+                    ].filter(Boolean).join(" • ");
 
                     return (
-                      <Text key={idx} style={{ fontSize: 12, color: AppColors.ui.text, marginTop: 8 }}>
-                        [{t.typology_category}] {t.typology} - Habitable: {habitableRange} m² - Terrasse: {terrasseRange ? `${terrasseRange} m²` : "-"} - Terrain: {terrainRange ? `${terrainRange} m²` : "-"} - Prix: {priceRange} - Units: {t.units}
-                      </Text>
+                      <View key={idx} style={{ marginTop: 8 }}>
+                        <Text style={{ fontSize: 12, color: AppColors.ui.text }}>
+                          [{t.typology_category}] {t.typology} - Habitable: {habitableRange} m² - Terrasse: {terrasseRange ? `${terrasseRange} m²` : "-"} - Terrain: {terrainRange ? `${terrainRange} m²` : "-"} - Prix: {priceRange} - Units: {t.units}
+                        </Text>
+                        {typologyExtras ? (
+                          <Text style={{ fontSize: 12, color: AppColors.gray.dark }}>{typologyExtras}</Text>
+                        ) : null}
+                      </View>
                     );
                   })}
                 </View>
               )}
             </>
           )}
+
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Amenities du résidentiel
+          </ThemedText>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {residentialAmenitiesOptions.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: amenities.includes(option) ? AppColors.primary.main : AppColors.gray.lighter,
+                  backgroundColor: amenities.includes(option) ? AppColors.primary.light + "30" : AppColors.ui.background,
+                }}
+                onPress={() => toggleSelection(option, amenities, setAmenities)}
+              >
+                <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            placeholder="Autre amenity"
+            style={styles.input}
+            value={amenitiesCustom}
+            onChangeText={setAmenitiesCustom}
+          />
+
+          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+            Composantes du projet
+          </ThemedText>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {projectComponentsOptions.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: projectComponents.includes(option) ? AppColors.primary.main : AppColors.gray.lighter,
+                  backgroundColor: projectComponents.includes(option) ? AppColors.primary.light + "30" : AppColors.ui.background,
+                }}
+                onPress={() => toggleSelection(option, projectComponents, setProjectComponents)}
+              >
+                <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            placeholder="Autre composante"
+            style={styles.input}
+            value={projectComponentsCustom}
+            onChangeText={setProjectComponentsCustom}
+          />
 
           {/* Retail */}
           {projectType === "Retail" && (
@@ -1564,6 +1980,35 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               <TextInput placeholder="Mix retail" style={styles.input} onChangeText={setMixRetail} />
               <TextInput placeholder="Enseignes" style={styles.input} onChangeText={setEnseignes} />
             </>
+          )}
+
+          {/* Business model */}
+          <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Business model</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+            {businessModelOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: businessModel === opt ? AppColors.primary.main : AppColors.gray.lighter,
+                  backgroundColor: businessModel === opt ? AppColors.primary.light + "30" : AppColors.ui.background,
+                }}
+                onPress={() => setBusinessModel(opt)}
+              >
+                <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{opt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {businessModel === "autre" && (
+            <TextInput
+              placeholder="Précisez le business model"
+              style={styles.input}
+              value={businessModelCustom}
+              onChangeText={setBusinessModelCustom}
+            />
           )}
 
           {/* Densité */}
@@ -1607,9 +2052,9 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                       <TextInput
                         placeholder="CUS"
                         style={styles.input}
-                        value={cus}
-                        onChangeText={setCus}
-                        keyboardType="decimal-pad"
+                        value={cus ? `${cus}%` : ""}
+                        onChangeText={(text) => setCus(cleanupPercentValue(text))}
+                        keyboardType="numeric"
                       />
                     </>
                   )}
@@ -1659,9 +2104,9 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                       <TextInput
                         placeholder="CUS"
                         style={styles.input}
-                        value={cus}
-                        onChangeText={setCus}
-                        keyboardType="decimal-pad"
+                        value={cus ? `${cus}%` : ""}
+                        onChangeText={(text) => setCus(cleanupPercentValue(text))}
+                        keyboardType="numeric"
                       />
                     </>
                   )}
@@ -1791,10 +2236,10 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
 
           <TouchableOpacity 
             style={styles.submitButton}
-            onPress={addProject}
+            onPress={saveProject}
             activeOpacity={0.8}
           >
-            <Text style={styles.submitButtonText}>✓ Ajouter projet</Text>
+            <Text style={styles.submitButtonText}>{isEditMode ? "✓ Mettre à jour" : "✓ Ajouter projet"}</Text>
           </TouchableOpacity>
 
           <View style={{ height: 20 }} />
@@ -2181,6 +2626,20 @@ const styles = StyleSheet.create({
   calendarCloseButtonText: {
     color: AppColors.ui.background,
     fontSize: 16,
+    fontWeight: "700",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: AppColors.gray.lightest,
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: AppColors.primary.main,
     fontWeight: "700",
   },
 });

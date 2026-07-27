@@ -155,6 +155,8 @@ Modal 1: Collectif / Villa / Lot de villas / Retail / Mixte
 ```sql
 INSERT INTO projects (
   name, city, quartier, latitude, longitude, developer, status, project_type,
+  standing_cible, business_model,
+  amenities, project_components,
   surface_fonciere_totale, surface_fonciere_collectif, surface_fonciere_villa,
   total_units, total_units_collectif, total_units_villa,
   delivery_date, start_commercial_date,
@@ -166,9 +168,15 @@ INSERT INTO projects (
 
 ### **Table `projects_typologies`**:
 ```sql
-INSERT INTO projects_typologies (project_id, typology_category, typology, ...)
--- typology_category = "Collectif" ou "Villa"
--- Chaque typologie avec sa catégorie
+INSERT INTO projects_typologies (
+  project_id, typology_category, typology,
+  surface_habitable_min, surface_habitable_max,
+  surface_terrasse_min, surface_terrasse_max,
+  surface_terrain_min, surface_terrain_max,
+  cus, cos, hauteur,
+  pricing_type, pricing_min, pricing_max,
+  pricing_unit, pricing_comment, units
+) VALUES (...)
 ```
 
 ### **Table `projects_density`**:

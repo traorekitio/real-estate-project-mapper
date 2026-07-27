@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from "react";
-import { StyleSheet, View, Text, Modal, Pressable, ScrollView } from "react-native";
+import { StyleSheet, View, Text, Modal, Pressable, ScrollView, TouchableOpacity } from "react-native";
 import MapView, { Marker } from "react-native-maps";
 import { supabase } from "../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { AppColors } from "@/constants/colors";
 
 type Project = {
@@ -15,6 +16,10 @@ type Project = {
   city?: string;
   quartier?: string;
   developer?: string;
+  standing_cible?: string;
+  business_model?: string;
+  amenities?: string[];
+  project_components?: string[];
   // Surfaces foncières séparées par type
   surface_fonciere_totale?: number;
   surface_fonciere_collectif?: number;
@@ -47,11 +52,22 @@ type Project = {
 
 type Typology = {
   id: string;
+  typology_category?: string;
   typology: string;
-  pricing: string;
-  surface_habitable?: number;
-  surface_terrasse?: number;
-  surface_terrain?: number;
+  surface_habitable_min?: number;
+  surface_habitable_max?: number;
+  surface_terrasse_min?: number;
+  surface_terrasse_max?: number;
+  surface_terrain_min?: number;
+  surface_terrain_max?: number;
+  cus?: number;
+  cos?: number;
+  hauteur?: string;
+  pricing_type?: string;
+  pricing_min?: number;
+  pricing_max?: number;
+  pricing_unit?: string;
+  pricing_comment?: string;
   units?: number;
 };
 
@@ -82,6 +98,7 @@ export default function MapScreen({
   markerBorderColor = "#7F7F7F",
   markerTextSize = 16
 }: MapViewProps) {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [projectTypologies, setProjectTypologies] = useState<Typology[]>([]);
@@ -210,6 +227,66 @@ export default function MapScreen({
     return `${formatted} MAD`;
   };
 
+  const formatRange = (min?: number, max?: number) => {
+    if (min != null && max != null) {
+      return `${min} - ${max}`;
+    }
+    if (min != null) {
+      return `${min}`;
+    }
+    if (max != null) {
+      return `${max}`;
+    }
+    return "";
+  };
+
+  const formatArray = (items?: string[] | null) => {
+    if (!items || items.length === 0) return "";
+    return items.join(" • ");
+  };
+
+  const formatNumericPrice = (value?: number | null, unit?: string) => {
+    if (value == null || Number.isNaN(value)) return "";
+    const formatted = value.toLocaleString("fr-FR", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+    return unit ? `${formatted} ${unit}` : formatted;
+  };
+
+  const getTypologyPriceLabel = (typology: Typology) => {
+    if (typology.pricing_type === "between" && typology.pricing_min != null && typology.pricing_max != null) {
+      return `Entre ${formatNumericPrice(typology.pricing_min, typology.pricing_unit)} et ${formatNumericPrice(typology.pricing_max, typology.pricing_unit)}`;
+    }
+    if (typology.pricing_type === "from" && typology.pricing_min != null) {
+      return `À partir de ${formatNumericPrice(typology.pricing_min, typology.pricing_unit)}`;
+    }
+    if (typology.pricing_min != null) {
+      return formatNumericPrice(typology.pricing_min, typology.pricing_unit);
+    }
+    return "Prix non précisé";
+  };
+
+  const getPriceRangeText = (typologies: Typology[]) => {
+    const values = typologies
+      .map((typology) => typology.pricing_min)
+      .filter((value): value is number => value != null && !Number.isNaN(value));
+
+    if (values.length === 0) {
+      return "Aucune donnée de prix";
+    }
+
+    const minPrice = Math.min(...values);
+    const maxPrice = Math.max(...values);
+    const unit = typologies.find((typology) => typology.pricing_unit)?.pricing_unit;
+
+    if (minPrice === maxPrice) {
+      return formatNumericPrice(minPrice, unit);
+    }
+
+    return `Entre ${formatNumericPrice(minPrice, unit)} et ${formatNumericPrice(maxPrice, unit)}`;
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchProjects();
@@ -315,6 +392,38 @@ export default function MapScreen({
                       {selectedProject.city}{selectedProject.quartier ? `, ${selectedProject.quartier}` : ""}
                     </Text>
                   </View>
+
+                  {/* Standing / Cible */}
+                  {selectedProject.standing_cible && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Standing / Cible</Text>
+                      <Text style={styles.detailsValue}>{selectedProject.standing_cible}</Text>
+                    </View>
+                  )}
+
+                  {/* Business model */}
+                  {selectedProject.business_model && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Business model</Text>
+                      <Text style={styles.detailsValue}>{selectedProject.business_model}</Text>
+                    </View>
+                  )}
+
+                  {/* Amenities */}
+                  {selectedProject.amenities && selectedProject.amenities.length > 0 && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Amenities</Text>
+                      <Text style={styles.detailsValue}>{formatArray(selectedProject.amenities)}</Text>
+                    </View>
+                  )}
+
+                  {/* Composantes */}
+                  {selectedProject.project_components && selectedProject.project_components.length > 0 && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Composantes</Text>
+                      <Text style={styles.detailsValue}>{formatArray(selectedProject.project_components)}</Text>
+                    </View>
+                  )}
 
                   {/* === DONNÉES PHYSIQUES === */}
 
@@ -466,28 +575,42 @@ export default function MapScreen({
                         <View key={typology.id} style={styles.typologyDetailItem}>
                           <View style={styles.typologyDetailHeader}>
                             <Text style={styles.typologyName}>{typology.typology}</Text>
-                            <Text style={styles.typologyPrice}>{formatPrice(typology.pricing)}</Text>
+                            <Text style={styles.typologyPrice}>{getTypologyPriceLabel(typology)}</Text>
                           </View>
-                          {(typology.surface_habitable || typology.surface_terrasse || typology.surface_terrain || typology.units) && (
+                          {(typology.surface_habitable_min != null || typology.surface_terrasse_min != null || typology.surface_terrain_min != null || typology.units != null || typology.cus != null || typology.cos != null || typology.hauteur || typology.pricing_comment) && (
                             <View style={styles.typologyDetails}>
-                              {typology.surface_habitable && (
+                              {(typology.surface_habitable_min != null || typology.surface_habitable_max != null) && (
                                 <Text style={styles.typologyDetailText}>
-                                  Surface habitable: {typology.surface_habitable} m²
+                                  Surface habitable: {formatRange(typology.surface_habitable_min, typology.surface_habitable_max)} m²
                                 </Text>
                               )}
-                              {typology.surface_terrasse && (
+                              {(typology.surface_terrasse_min != null || typology.surface_terrasse_max != null) && (
                                 <Text style={styles.typologyDetailText}>
-                                  Surface terrasse: {typology.surface_terrasse} m²
+                                  Surface terrasse: {formatRange(typology.surface_terrasse_min, typology.surface_terrasse_max)} m²
                                 </Text>
                               )}
-                              {typology.surface_terrain && (
+                              {(typology.surface_terrain_min != null || typology.surface_terrain_max != null) && (
                                 <Text style={styles.typologyDetailText}>
-                                  Surface terrain: {typology.surface_terrain} m²
+                                  Surface terrain: {formatRange(typology.surface_terrain_min, typology.surface_terrain_max)} m²
                                 </Text>
                               )}
-                              {typology.units && (
+                              {typology.units != null && (
                                 <Text style={styles.typologyDetailText}>
                                   Nombre d'unités: {typology.units}
+                                </Text>
+                              )}
+                              {(typology.cus != null || typology.cos != null || typology.hauteur) && (
+                                <Text style={styles.typologyDetailText}>
+                                  {[typology.cus != null ? `CUS: ${typology.cus}%` : null,
+                                    typology.cos != null ? `COS: ${typology.cos}%` : null,
+                                    typology.hauteur ? `Hauteur: ${typology.hauteur}` : null]
+                                    .filter(Boolean)
+                                    .join(" • ")}
+                                </Text>
+                              )}
+                              {typology.pricing_comment && (
+                                <Text style={styles.typologyDetailText}>
+                                  {typology.pricing_comment}
                                 </Text>
                               )}
                             </View>
@@ -502,11 +625,7 @@ export default function MapScreen({
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Gamme de prix</Text>
                       <View style={styles.priceRange}>
-                        <Text style={styles.priceText}>
-                          {projectTypologies.length === 1 
-                            ? formatPrice(projectTypologies[0].pricing)
-                            : `${formatPrice(projectTypologies[0].pricing)} à ${formatPrice(projectTypologies[projectTypologies.length - 1].pricing)}`}
-                        </Text>
+                        <Text style={styles.priceText}>{getPriceRangeText(projectTypologies)}</Text>
                       </View>
                     </View>
                   )}
@@ -565,6 +684,16 @@ export default function MapScreen({
                   )}
                 </>
               )}
+
+              <TouchableOpacity
+                style={styles.editButton}
+                onPress={() => {
+                  setSelectedProject(null);
+                  router.push(`/(tabs)/AddProject?projectId=${selectedProject?.id}`);
+                }}
+              >
+                <Text style={styles.editButtonText}>Modifier ce projet</Text>
+              </TouchableOpacity>
 
               <View style={{ height: 30 }} />
             </ScrollView>
@@ -656,6 +785,22 @@ const styles = StyleSheet.create({
   detailsCloseButton: {
     fontSize: 28,
     color: AppColors.primary.main,
+    fontWeight: "700",
+  },
+
+  editButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: AppColors.primary.main,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  editButtonText: {
+    color: AppColors.ui.background,
+    fontSize: 16,
     fontWeight: "700",
   },
 
