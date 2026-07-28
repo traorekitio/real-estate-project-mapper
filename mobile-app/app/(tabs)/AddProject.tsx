@@ -9,12 +9,13 @@ import {
   ScrollView,
   Dimensions,
   Alert,
+  Platform,
   Modal,
   TouchableOpacity,
   Text,
   ActivityIndicator,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker } from "@/components/ui/MapViewWrapper";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { OpenLocationCode } from "open-location-code";
 
@@ -266,6 +267,15 @@ const monthNames = [
   "Décembre",
 ];
 
+const showSaveSuccessMessage = (message: string) => {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    window.alert(message);
+    return;
+  }
+
+  Alert.alert("Succès", message);
+};
+
 const getCalendarMatrix = (date: Date) => {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -421,6 +431,7 @@ export default function AddProjectScreen() {
   const [pricingComment, setPricingComment] = useState("");
   const [units, setUnits] = useState("");
   const [typologiesList, setTypologiesList] = useState<any[]>([]);
+  const [editingTypologyIndex, setEditingTypologyIndex] = useState<number | null>(null);
   const [standingCible, setStandingCible] = useState("");
   const [amenities, setAmenities] = useState<string[]>([]);
   const [amenitiesCustom, setAmenitiesCustom] = useState("");
@@ -457,7 +468,7 @@ export default function AddProjectScreen() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<any | null>(null);
   const openLocationCode = new OpenLocationCode();
 
   // --- Unités de surface ---
@@ -809,7 +820,6 @@ export default function AddProjectScreen() {
   const isMixedProject = categories.length > 1;
 
   const addCurrentTypology = () => {
-    // Pour projet simple, utiliser la catégorie par défaut. Pour mixte, vérifier la sélection
     const categoryToUse = isMixedProject ? currentTypologyCategory : categories[0];
 
     if (!currentTypology || !categoryToUse) {
@@ -817,31 +827,36 @@ export default function AddProjectScreen() {
       return;
     }
 
-    setTypologiesList([
-      ...typologiesList,
-      {
-        typology_category: categoryToUse,
-        typology: currentTypology,
-        surfaceHabitableMin,
-        surfaceHabitableMax,
-        surfaceTerrasseMin,
-        surfaceTerrasseMax,
-        surfaceTerrainMin,
-        surfaceTerrainMax,
-        cus: cusTypology,
-        cos: cosTypology,
-        hauteur: hauteurTypology,
-        pricingMode,
-        pricingMin,
-        pricingMax,
-        pricingUnit,
-        pricingComment,
-        units,
-      },
-    ]);
+    const newTypology = {
+      typology_category: categoryToUse,
+      typology: currentTypology,
+      surfaceHabitableMin,
+      surfaceHabitableMax,
+      surfaceTerrasseMin,
+      surfaceTerrasseMax,
+      surfaceTerrainMin,
+      surfaceTerrainMax,
+      cus: cusTypology,
+      cos: cosTypology,
+      hauteur: hauteurTypology,
+      pricingMode,
+      pricingMin,
+      pricingMax,
+      pricingUnit,
+      pricingComment,
+      units,
+    };
+
+    if (editingTypologyIndex !== null) {
+      setTypologiesList((prev) =>
+        prev.map((item, index) => (index === editingTypologyIndex ? newTypology : item))
+      );
+      setEditingTypologyIndex(null);
+    } else {
+      setTypologiesList((prev) => [...prev, newTypology]);
+    }
 
     setCurrentTypology("");
-    // Garder la catégorie sélectionnée pour faciliter l'ajout multiple
     if (isMixedProject) {
       setCurrentTypologyCategory(currentTypologyCategory);
     } else {
@@ -863,6 +878,54 @@ export default function AddProjectScreen() {
     setPricingComment("");
     setUnits("");
     setBusinessModelCustom("");
+  };
+
+  const editTypology = (index: number) => {
+    const typology = typologiesList[index];
+    setEditingTypologyIndex(index);
+    setCurrentTypology(typology.typology || "");
+    setCurrentTypologyCategory(typology.typology_category || categories[0]);
+    setSurfaceHabitableMin(typology.surfaceHabitableMin || "");
+    setSurfaceHabitableMax(typology.surfaceHabitableMax || "");
+    setSurfaceTerrasseMin(typology.surfaceTerrasseMin || "");
+    setSurfaceTerrasseMax(typology.surfaceTerrasseMax || "");
+    setSurfaceTerrainMin(typology.surfaceTerrainMin || "");
+    setSurfaceTerrainMax(typology.surfaceTerrainMax || "");
+    setCusTypology(typology.cus || "");
+    setCosTypology(typology.cos || "");
+    setHauteurTypology(typology.hauteur || "");
+    setPricingMode(typology.pricingMode || "from");
+    setPricingMin(typology.pricingMin || "");
+    setPricingMax(typology.pricingMax || "");
+    setPricingUnit(typology.pricingUnit || "MMAD");
+    setPricingComment(typology.pricingComment || "");
+    setUnits(typology.units || "");
+  };
+
+  const deleteTypology = (index: number) => {
+    setTypologiesList((prev) => prev.filter((_, idx) => idx !== index));
+    if (editingTypologyIndex === index) {
+      setEditingTypologyIndex(null);
+      setCurrentTypology("");
+      setCurrentTypologyCategory(isMixedProject ? categories[0] : categories[0]);
+      setSurfaceHabitableMin("");
+      setSurfaceHabitableMax("");
+      setSurfaceTerrasseMin("");
+      setSurfaceTerrasseMax("");
+      setSurfaceTerrainMin("");
+      setSurfaceTerrainMax("");
+      setCusTypology("");
+      setCosTypology("");
+      setHauteurTypology("");
+      setPricingMode("from");
+      setPricingMin("");
+      setPricingMax("");
+      setPricingUnit("MMAD");
+      setPricingComment("");
+      setUnits("");
+    } else if (editingTypologyIndex !== null && index < editingTypologyIndex) {
+      setEditingTypologyIndex(editingTypologyIndex - 1);
+    }
   };
 
   const extractPlusCode = (text: string): string | null => {
@@ -1007,7 +1070,7 @@ export default function AddProjectScreen() {
     setSelectedLocationLabel(result.display_name || locationQuery);
     setLocationResults([]);
 
-    if (mapRef.current) {
+    if (mapRef.current && typeof mapRef.current.animateToRegion === "function") {
       mapRef.current.animateToRegion(newRegion, 600);
     }
   };
@@ -1193,7 +1256,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
       }]);
     }
 
-    Alert.alert("Succès", isEditMode ? "Projet mis à jour !" : "Projet ajouté !");
+    showSaveSuccessMessage(isEditMode ? "Projet mis à jour !" : "Projet ajouté !");
     router.replace("/(tabs)/explore");
   };
 
@@ -1247,7 +1310,12 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             value={name}
             onChangeText={setName}
           />
-          <View style={{ position: "relative" }}>
+          <View
+            style={[
+              styles.suggestionFieldWrapper,
+              activeSuggestion === "city" && styles.suggestionFieldWrapperActive,
+            ]}
+          >
             <TextInput
               placeholder="Ville"
               style={styles.input}
@@ -1277,7 +1345,12 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               </ScrollView>
             )}
           </View>
-          <View style={{ position: "relative" }}>
+          <View
+            style={[
+              styles.suggestionFieldWrapper,
+              activeSuggestion === "quartier" && styles.suggestionFieldWrapperActive,
+            ]}
+          >
             <TextInput
               placeholder="Quartier"
               style={styles.input}
@@ -1307,7 +1380,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               </ScrollView>
             )}
           </View>
-          <TextInput placeholder="Développeur" style={styles.input} onChangeText={setDeveloper} />
+          <TextInput placeholder="Développeur" style={styles.input} value={developer} onChangeText={setDeveloper} />
           <Text style={{ marginBottom: 8, fontSize: 14, fontWeight: "600", color: AppColors.primary.main }}>Standing / cible</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
             {standingOptions.map((opt) => (
@@ -1411,14 +1484,18 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           <TextInput
             placeholder="Nombre total d'unités"
             style={styles.input}
+            value={totalUnitsGlobal}
             onChangeText={setTotalUnitsGlobal}
+            keyboardType="decimal-pad"
           />
 
           {isMixedProject && categories.includes("Collectif") && (
             <TextInput
               placeholder="Nombre d'unités Collectif"
               style={styles.input}
+              value={totalUnitsCollectif}
               onChangeText={setTotalUnitsCollectif}
+              keyboardType="decimal-pad"
             />
           )}
 
@@ -1426,7 +1503,9 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             <TextInput
               placeholder="Nombre d'unités Villa"
               style={styles.input}
+              value={totalUnitsVilla}
               onChangeText={setTotalUnitsVilla}
+              keyboardType="decimal-pad"
             />
           )}
 
@@ -1434,11 +1513,18 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             <TextInput
               placeholder="Nombre d'unités Lot de villas"
               style={styles.input}
+              value={totalUnitsVillaLot}
               onChangeText={setTotalUnitsVillaLot}
+              keyboardType="decimal-pad"
             />
           )}
 
-          <View style={{ position: "relative" }}>
+          <View
+            style={[
+              styles.suggestionFieldWrapper,
+              showStatusSuggestions && styles.suggestionFieldWrapperActive,
+            ]}
+          >
             <TextInput
               placeholder="Statut"
               style={styles.input}
@@ -1450,7 +1536,12 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               onFocus={() => setShowStatusSuggestions(true)}
             />
             {showStatusSuggestions && getStatusSuggestions().length > 0 && (
-              <View style={styles.suggestionsContainer}>
+              <ScrollView
+                style={styles.suggestionsContainer}
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={styles.suggestionsContent}
+              >
                 {getStatusSuggestions().map((item) => (
                   <TouchableOpacity
                     key={item}
@@ -1460,7 +1551,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <Text style={styles.suggestionText}>{item}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             )}
           </View>
 
@@ -1664,14 +1755,18 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           <TextInput
             placeholder="Unités restantes global"
             style={styles.input}
+            value={unitsRemainingGlobal}
             onChangeText={setUnitsRemainingGlobal}
+            keyboardType="decimal-pad"
           />
 
           {isMixedProject && categories.includes("Collectif") && (
             <TextInput
               placeholder="Unités restantes Collectif"
               style={styles.input}
+              value={unitsRemainingCollectif}
               onChangeText={setUnitsRemainingCollectif}
+              keyboardType="decimal-pad"
             />
           )}
 
@@ -1679,7 +1774,9 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             <TextInput
               placeholder="Unités restantes Villa"
               style={styles.input}
+              value={unitsRemainingVilla}
               onChangeText={setUnitsRemainingVilla}
+              keyboardType="decimal-pad"
             />
           )}
 
@@ -1687,7 +1784,9 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             <TextInput
               placeholder="Unités restantes Lot de villas"
               style={styles.input}
+              value={unitsRemainingVillaLot}
               onChangeText={setUnitsRemainingVillaLot}
+              keyboardType="decimal-pad"
             />
           )}
 
@@ -1882,7 +1981,10 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                 keyboardType="decimal-pad"
               />
 
-              <Button title="Ajouter Typologie" onPress={addCurrentTypology} />
+              <Button
+                title={editingTypologyIndex !== null ? "Modifier Typologie" : "Ajouter Typologie"}
+                onPress={addCurrentTypology}
+              />
 
               {typologiesList.length > 0 && (
                 <View style={{ marginTop: 15 }}>
@@ -1901,13 +2003,33 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     ].filter(Boolean).join(" • ");
 
                     return (
-                      <View key={idx} style={{ marginTop: 8 }}>
+                      <View key={idx} style={{ marginTop: 8, padding: 10, borderWidth: 1, borderColor: AppColors.gray.lighter, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 12, color: AppColors.ui.text, marginBottom: 4 }}>
+                          [{t.typology_category}] {t.typology}
+                        </Text>
                         <Text style={{ fontSize: 12, color: AppColors.ui.text }}>
-                          [{t.typology_category}] {t.typology} - Habitable: {habitableRange} m² - Terrasse: {terrasseRange ? `${terrasseRange} m²` : "-"} - Terrain: {terrainRange ? `${terrainRange} m²` : "-"} - Prix: {priceRange} - Units: {t.units}
+                          Habitable: {habitableRange} m² • Terrasse: {terrasseRange ? `${terrasseRange} m²` : "-"} • Terrain: {terrainRange ? `${terrainRange} m²` : "-"}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: AppColors.ui.text }}>
+                          Prix: {priceRange} • Units: {t.units}
                         </Text>
                         {typologyExtras ? (
-                          <Text style={{ fontSize: 12, color: AppColors.gray.dark }}>{typologyExtras}</Text>
+                          <Text style={{ fontSize: 12, color: AppColors.gray.dark, marginTop: 4 }}>{typologyExtras}</Text>
                         ) : null}
+                        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, padding: 10, borderRadius: 8, backgroundColor: AppColors.primary.light }}
+                            onPress={() => editTypology(idx)}
+                          >
+                            <Text style={{ color: AppColors.primary.main, textAlign: "center", fontWeight: "700" }}>Modifier</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 1, padding: 10, borderRadius: 8, backgroundColor: AppColors.gray.lighter }}
+                            onPress={() => deleteTypology(idx)}
+                          >
+                            <Text style={{ color: AppColors.ui.text, textAlign: "center", fontWeight: "700" }}>Supprimer</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     );
                   })}
@@ -2214,11 +2336,11 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           </View>
 
           <MapView
-            ref={(ref) => { mapRef.current = ref; }}
+            ref={(ref: any) => { mapRef.current = ref; }}
             style={styles.map}
             mapType={mapType}
             region={mapRegion}
-            onPress={(e) => {
+            onPress={(e: any) => {
               const lat = e.nativeEvent.coordinate.latitude;
               const lon = e.nativeEvent.coordinate.longitude;
               setLatitude(lat);
@@ -2231,7 +2353,18 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               });
             }}
           >
-            {latitude && longitude && <Marker coordinate={{ latitude, longitude }} />}
+            {latitude && longitude && (
+              <Marker
+                coordinate={{ latitude, longitude }}
+                iconHtml={
+                  mapType === "satellite"
+                    ? `<div style="width:28px;height:28px;border-radius:14px;background:#31849B;border:2px solid #7F7F7F;"></div>`
+                    : `<div style="font-size:24px;">📍</div>`
+                }
+                iconSize={[28, 28]}
+                anchor={{ x: 0.5, y: 0.5 }}
+              />
+            )}
           </MapView>
 
           <TouchableOpacity 
@@ -2489,6 +2622,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  suggestionFieldWrapper: {
+    position: "relative",
+    zIndex: 1,
+  },
+
+  suggestionFieldWrapperActive: {
+    zIndex: 50,
+  },
+
   suggestionsContainer: {
     position: "absolute",
     top: 56,
@@ -2498,7 +2640,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: AppColors.gray.lighter,
     borderRadius: 10,
-    zIndex: 10,
+    zIndex: 60,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,

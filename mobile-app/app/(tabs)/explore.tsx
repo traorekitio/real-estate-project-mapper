@@ -5,6 +5,15 @@ import MapScreen from "@/components/ui/MapView";
 import { useRouter } from "expo-router";
 import { AppColors } from "@/constants/colors";
 
+type ProjectTypeColorKey = "Collectif" | "Villa" | "Lot de villas" | "Retail";
+
+const PROJECT_TYPE_COLOR_LABELS: Record<ProjectTypeColorKey, string> = {
+  Collectif: "Collectif",
+  Villa: "Villa",
+  "Lot de villas": "Lot de villas",
+  Retail: "Retail",
+};
+
 export default function TabTwoScreen() {
   const router = useRouter();
   const [mapType, setMapType] = useState<"standard" | "satellite" | "hybrid" | "terrain">("standard");
@@ -13,7 +22,13 @@ export default function TabTwoScreen() {
   // States pour la personnalisation des marqueurs
   const [showMarkerSettings, setShowMarkerSettings] = useState(false);
   const [markerSize, setMarkerSize] = useState(36);
-  const [markerColor, setMarkerColor] = useState("#31849B");
+  const [projectTypeColors, setProjectTypeColors] = useState<Record<ProjectTypeColorKey, string>>({
+    Collectif: "#31849B",
+    Villa: "#FF0066",
+    "Lot de villas": "#00CCEE",
+    Retail: "#00B050",
+  });
+  const [activeColorType, setActiveColorType] = useState<ProjectTypeColorKey>("Collectif");
   const [markerBorderColor, setMarkerBorderColor] = useState("#7F7F7F");
   const [markerTextSize, setMarkerTextSize] = useState(16);
   const [customColor, setCustomColor] = useState("");
@@ -43,7 +58,10 @@ export default function TabTwoScreen() {
 
   const handleAddCustomColor = (color: string) => {
     if (color && color.match(/^#[0-9A-F]{6}$/i)) {
-      setMarkerColor(color);
+      setProjectTypeColors((previous) => ({
+        ...previous,
+        [activeColorType]: color,
+      }));
       setCustomColor("");
       setShowCustomColorInput(false);
     }
@@ -52,8 +70,8 @@ export default function TabTwoScreen() {
   const handleAddCustomBorderColor = (color: string) => {
     if (color && color.match(/^#[0-9A-F]{6}$/i)) {
       setMarkerBorderColor(color);
-      setCustomColor("");
-      setShowCustomColorInput(false);
+      setCustomBorderColor("");
+      setShowCustomBorderColorInput(false);
     }
   };
 
@@ -63,7 +81,8 @@ export default function TabTwoScreen() {
       <MapScreen 
         mapType={mapType}
         markerSize={markerSize}
-        markerColor={markerColor}
+        markerColor={projectTypeColors[activeColorType]}
+        projectTypeColors={projectTypeColors}
         markerBorderColor={markerBorderColor}
         markerTextSize={markerTextSize}
       />
@@ -266,6 +285,29 @@ export default function TabTwoScreen() {
             {/* Couleur du cercle */}
             <View style={styles.settingSection}>
               <Text style={styles.settingLabel}>Couleur du cercle</Text>
+
+              <View style={styles.typeSelectorWrap}>
+                {(Object.keys(PROJECT_TYPE_COLOR_LABELS) as ProjectTypeColorKey[]).map((typeKey) => (
+                  <TouchableOpacity
+                    key={typeKey}
+                    style={[
+                      styles.typeSelectorPill,
+                      activeColorType === typeKey && styles.typeSelectorPillActive,
+                    ]}
+                    onPress={() => setActiveColorType(typeKey)}
+                  >
+                    <Text
+                      style={[
+                        styles.typeSelectorPillText,
+                        activeColorType === typeKey && styles.typeSelectorPillTextActive,
+                      ]}
+                    >
+                      {PROJECT_TYPE_COLOR_LABELS[typeKey]}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               <View style={styles.colorGrid}>
                 {colorOptions.map((color) => (
                   <TouchableOpacity
@@ -273,11 +315,16 @@ export default function TabTwoScreen() {
                     style={[
                       styles.colorOption,
                       { backgroundColor: color },
-                      markerColor === color && styles.colorOptionActive,
+                      projectTypeColors[activeColorType] === color && styles.colorOptionActive,
                     ]}
-                    onPress={() => setMarkerColor(color)}
+                    onPress={() =>
+                      setProjectTypeColors((previous) => ({
+                        ...previous,
+                        [activeColorType]: color,
+                      }))
+                    }
                   >
-                    {markerColor === color && (
+                    {projectTypeColors[activeColorType] === color && (
                       <Text style={styles.checkmark}>✓</Text>
                     )}
                   </TouchableOpacity>
@@ -367,7 +414,7 @@ export default function TabTwoScreen() {
                     width: markerSize,
                     height: markerSize,
                     borderRadius: markerSize / 2,
-                    backgroundColor: markerColor,
+                    backgroundColor: projectTypeColors[activeColorType],
                     borderColor: markerBorderColor,
                   }
                 ]}>
@@ -603,6 +650,37 @@ const styles = StyleSheet.create({
 
   settingSection: {
     marginBottom: 24,
+  },
+
+  typeSelectorWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  typeSelectorPill: {
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: AppColors.ui.background,
+  },
+
+  typeSelectorPillActive: {
+    backgroundColor: AppColors.primary.main,
+    borderColor: AppColors.primary.main,
+  },
+
+  typeSelectorPillText: {
+    color: AppColors.primary.main,
+    fontWeight: "600",
+    fontSize: 12,
+  },
+
+  typeSelectorPillTextActive: {
+    color: AppColors.ui.background,
   },
 
   settingLabel: {

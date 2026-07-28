@@ -51,10 +51,10 @@ export const LogoHeader: React.FC<LogoHeaderProps> = ({
     >
       <Image
         source={require('@/assets/logos/logo.png')}
+        resizeMode="contain"
         style={{
           width: sizeStyles.logo,
           height: sizeStyles.logo,
-          resizeMode: 'contain',
         }}
       />
       {showText && (
