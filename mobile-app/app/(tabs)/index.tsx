@@ -107,6 +107,16 @@ export default function HomeScreen() {
           <Text style={styles.actionCardTitle}>Ajouter Projet</Text>
           <Text style={styles.actionCardDesc}>Créez un nouveau projet</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionCard, styles.actionCardPrimary]}
+          onPress={() => navigateTo('/(tabs)/dashboard')}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.actionCardIcon}>📊</Text>
+          <Text style={styles.actionCardTitle}>Dashboards</Text>
+          <Text style={styles.actionCardDesc}>KPI, pricing, surfaces, geo</Text>
+        </TouchableOpacity>
       </View>
 
       {/* === STATISTIQUES === */}

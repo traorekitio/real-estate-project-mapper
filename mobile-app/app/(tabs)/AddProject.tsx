@@ -3,18 +3,19 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
-  TextInput,
+  TextInput as RNTextInput,
   Button,
   StyleSheet,
   ScrollView,
   Dimensions,
-  Alert,
   Platform,
   Modal,
   TouchableOpacity,
   Text,
   ActivityIndicator,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import MapView, { Marker } from "@/components/ui/MapViewWrapper";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { OpenLocationCode } from "open-location-code";
@@ -22,8 +23,58 @@ import { OpenLocationCode } from "open-location-code";
 import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
 import { AppColors } from "@/constants/colors";
+import AppNoticeModal, { NoticeType } from "@/components/ui/AppNoticeModal";
 
-const projectMainTypes = ["Collectif", "Villa", "Lot de villas", "Retail", "Mixte"];
+type NoticeState = {
+  visible: boolean;
+  type: NoticeType;
+  title: string;
+  message: string;
+  primaryLabel: string;
+  primaryVariant?: "primary" | "secondary" | "danger";
+  secondaryLabel?: string;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
+};
+
+type MediaItem = {
+  id?: string;
+  uri: string;
+  isExisting?: boolean;
+};
+
+type CountByTypeItem = {
+  name: string;
+  count: string;
+};
+
+type OfficeSpaceItem = {
+  space: string;
+  description: string;
+  pricingMode: "from" | "between";
+  pricingMin: string;
+  pricingMax: string;
+  pricingUnit: string;
+  pricingComment?: string;
+  pricing?: string;
+};
+
+type HotelRoomItem = {
+  type: string;
+  count: string;
+  surface: string;
+};
+
+type HotelServiceItem = {
+  name: string;
+  type: string;
+  capacity: string;
+  count?: string;
+  roomsCount?: string;
+  surface?: string;
+};
+
+const projectMainTypes = ["Collectif", "Villa", "Lot de villas", "Retail", "Mixte", "Bureau", "Santé", "Hotel"];
 
 const projectMixedTypes = [
   "Collectif/Villa",
@@ -204,6 +255,100 @@ const statusOptions = [
   "En cours de livraison/construction",
 ];
 
+const retailStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
+const officeStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
+const healthStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
+const hotelStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
+
+const retailTypologyOptions = ["Centre urbain", "Centre de proximité", "Centre lifestyle", "Retail park", "Mall régional", "Autre"];
+const retailFoodTypeOptions = [
+  "Restaurant",
+  "Café / Coffee Shop",
+  "Bar",
+  "Lounge",
+  "Fast Food / QSR",
+  "Fast Casual",
+  "Dessert / Ice Cream",
+  "Bakery / Pâtisserie",
+  "Tea Room",
+  "Food Court",
+  "Beach Club",
+  "Rooftop",
+  "Wine Bar",
+  "Night Club",
+];
+const clinicTypologyOptions = ["Clinique privée", "Clinique spécialisée", "Polyclinique", "Autre"];
+const hotelCategoryOptions = ["5 étoiles", "4 étoiles", "3 étoiles", "2 étoiles", "1 étoile", "RH", "RIPT", "Autre"];
+
+type AutoNextTextInputProps = React.ComponentProps<typeof RNTextInput>;
+const autoNextInputRegistry: RNTextInput[] = [];
+
+const setForwardedTextInputRef = (forwardedRef: React.ForwardedRef<RNTextInput>, node: RNTextInput | null) => {
+  if (!forwardedRef) return;
+  if (typeof forwardedRef === "function") {
+    forwardedRef(node);
+    return;
+  }
+  forwardedRef.current = node;
+};
+
+const unregisterTextInput = (node: RNTextInput | null) => {
+  if (!node) return;
+  const index = autoNextInputRegistry.indexOf(node);
+  if (index >= 0) {
+    autoNextInputRegistry.splice(index, 1);
+  }
+};
+
+const focusNextTextInput = (current: RNTextInput | null) => {
+  if (!current) return;
+  const index = autoNextInputRegistry.indexOf(current);
+  if (index < 0) return;
+
+  for (let i = index + 1; i < autoNextInputRegistry.length; i += 1) {
+    const next = autoNextInputRegistry[i];
+    if (next && typeof next.focus === "function") {
+      next.focus();
+      break;
+    }
+  }
+};
+
+const TextInput = React.forwardRef<RNTextInput, AutoNextTextInputProps>((props, forwardedRef) => {
+  const localRef = useRef<RNTextInput | null>(null);
+
+  const registerRef = useCallback((node: RNTextInput | null) => {
+    unregisterTextInput(localRef.current);
+    localRef.current = node;
+    if (node && !autoNextInputRegistry.includes(node)) {
+      autoNextInputRegistry.push(node);
+    }
+    setForwardedTextInputRef(forwardedRef, node);
+  }, [forwardedRef]);
+
+  useEffect(() => () => {
+    unregisterTextInput(localRef.current);
+  }, []);
+
+  return (
+    <RNTextInput
+      {...props}
+      ref={registerRef}
+      blurOnSubmit={props.blurOnSubmit ?? false}
+      returnKeyType={props.returnKeyType ?? "next"}
+      onSubmitEditing={(event) => {
+        props.onSubmitEditing?.(event);
+        const shouldKeepCurrent = props.multiline || props.returnKeyType === "search" || props.returnKeyType === "done";
+        if (!shouldKeepCurrent) {
+          focusNextTextInput(localRef.current);
+        }
+      }}
+    />
+  );
+});
+
+TextInput.displayName = "AutoNextTextInput";
+
 const residentialAmenitiesOptions = [
   "Piscine",
   "Salle de sport",
@@ -267,15 +412,6 @@ const monthNames = [
   "Décembre",
 ];
 
-const showSaveSuccessMessage = (message: string) => {
-  if (Platform.OS === "web" && typeof window !== "undefined") {
-    window.alert(message);
-    return;
-  }
-
-  Alert.alert("Succès", message);
-};
-
 const getCalendarMatrix = (date: Date) => {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -312,6 +448,26 @@ const filterSuggestions = (value: string, list: string[]) => {
   const query = value.trim().toLowerCase();
   if (!query) return list;
   return list.filter((item) => item.toLowerCase().startsWith(query));
+};
+
+const getStatusOptionsByProjectType = (projectType: string) => {
+  switch (projectType) {
+    case "Retail":
+      return retailStatusOptions;
+    case "Bureau":
+      return officeStatusOptions;
+    case "Santé":
+      return healthStatusOptions;
+    case "Hotel":
+      return hotelStatusOptions;
+    default:
+      return statusOptions;
+  }
+};
+
+const upsertListItem = <T,>(items: T[], item: T, editIndex: number | null) => {
+  if (editIndex === null) return [...items, item];
+  return items.map((current, index) => (index === editIndex ? item : current));
 };
 
 // Fonction de conversion de surfaces
@@ -355,11 +511,12 @@ const toggleSurfaceUnit = (
 export default function AddProjectScreen() {
   const router = useRouter();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
+  const hasProjectId = typeof projectId === "string" && projectId.trim().length > 0;
 
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isLoadingProject, setIsLoadingProject] = useState(false);
-  const [showMainTypeModal, setShowMainTypeModal] = useState(!projectId);
+  const [showMainTypeModal, setShowMainTypeModal] = useState(!hasProjectId);
   const [showMixedTypeModal, setShowMixedTypeModal] = useState(false);
   const [projectType, setProjectType] = useState("");
   const [mapType, setMapType] = useState<"standard" | "satellite" | "terrain">("standard");
@@ -374,9 +531,11 @@ export default function AddProjectScreen() {
   const [activeSuggestion, setActiveSuggestion] = useState<"city" | "quartier" | null>(null);
   const [showDeliveryDatePicker, setShowDeliveryDatePicker] = useState(false);
   const [showStartCommercialDatePicker, setShowStartCommercialDatePicker] = useState(false);
+  const [showOpeningDatePicker, setShowOpeningDatePicker] = useState(false);
   const [deliveryDateObj, setDeliveryDateObj] = useState<Date | null>(null);
   const [startCommercialDateObj, setStartCommercialDateObj] = useState<Date | null>(null);
-  const [activeCalendar, setActiveCalendar] = useState<"delivery" | "start" | null>(null);
+  const [openingDateObj, setOpeningDateObj] = useState<Date | null>(null);
+  const [activeCalendar, setActiveCalendar] = useState<"delivery" | "start" | "opening" | null>(null);
 
   // --- Surfaces Foncières ---
   const [surfaceFonciereTotal, setSurfaceFonciereTotal] = useState("");
@@ -393,6 +552,7 @@ export default function AddProjectScreen() {
   // --- Dates ---
   const [deliveryDate, setDeliveryDate] = useState("");
   const [startCommercialDate, setStartCommercialDate] = useState("");
+  const [openingDate, setOpeningDate] = useState("");
 
   // --- Commercialisation ---
   const [commercializationRateGlobal, setCommercializationRateGlobal] = useState("");
@@ -458,6 +618,80 @@ export default function AddProjectScreen() {
   const [positionnement, setPositionnement] = useState("");
   const [mixRetail, setMixRetail] = useState("");
   const [enseignes, setEnseignes] = useState("");
+  const [sourceLink, setSourceLink] = useState("");
+  const [photos, setPhotos] = useState<MediaItem[]>([]);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+
+  const [retailTypology, setRetailTypology] = useState("");
+  const [retailNiveaux, setRetailNiveaux] = useState("");
+  const [retailCommerces, setRetailCommerces] = useState("");
+  const [retailParkingPlaces, setRetailParkingPlaces] = useState("");
+  const [retailParkingType, setRetailParkingType] = useState("");
+  const [retailParkingRatio, setRetailParkingRatio] = useState("");
+  const [retailShoppingCount, setRetailShoppingCount] = useState("");
+  const [retailShoppingBrands, setRetailShoppingBrands] = useState("");
+  const [retailFoodCount, setRetailFoodCount] = useState("");
+  const [retailFoodBrands, setRetailFoodBrands] = useState("");
+  const [retailFoodTypologies, setRetailFoodTypologies] = useState<string[]>([]);
+  const [retailServicesCount, setRetailServicesCount] = useState("");
+  const [retailServicesBrands, setRetailServicesBrands] = useState("");
+  const [retailLeisureCount, setRetailLeisureCount] = useState("");
+  const [retailLeisureBrands, setRetailLeisureBrands] = useState("");
+  const [retailMainTenants, setRetailMainTenants] = useState("");
+  const [retailOccupancyRate, setRetailOccupancyRate] = useState("");
+
+  const [officeType, setOfficeType] = useState("");
+  const [officeConcept, setOfficeConcept] = useState("");
+  const [officeTarget, setOfficeTarget] = useState("");
+  const [officeServices, setOfficeServices] = useState("");
+  const [officeSpaces, setOfficeSpaces] = useState<OfficeSpaceItem[]>([]);
+  const [officeSpaceInput, setOfficeSpaceInput] = useState<OfficeSpaceItem>({
+    space: "",
+    description: "",
+    pricingMode: "from",
+    pricingMin: "",
+    pricingMax: "",
+    pricingUnit: "MAD",
+    pricingComment: "",
+  });
+  const [editingOfficeSpaceIndex, setEditingOfficeSpaceIndex] = useState<number | null>(null);
+
+  const [clinicTypology, setClinicTypology] = useState("");
+  const [clinicDescription, setClinicDescription] = useState("");
+  const [clinicBeds, setClinicBeds] = useState("");
+  const [clinicDoctors, setClinicDoctors] = useState("");
+  const [clinicBedTypes, setClinicBedTypes] = useState<CountByTypeItem[]>([]);
+  const [clinicDoctorTypes, setClinicDoctorTypes] = useState<CountByTypeItem[]>([]);
+  const [clinicBedInput, setClinicBedInput] = useState<CountByTypeItem>({ name: "", count: "" });
+  const [clinicDoctorInput, setClinicDoctorInput] = useState<CountByTypeItem>({ name: "", count: "" });
+  const [editingClinicBedIndex, setEditingClinicBedIndex] = useState<number | null>(null);
+  const [editingClinicDoctorIndex, setEditingClinicDoctorIndex] = useState<number | null>(null);
+  const [clinicEquipments, setClinicEquipments] = useState("");
+  const [clinicOperatingBlocks, setClinicOperatingBlocks] = useState("");
+  const [clinicComplementaryRooms, setClinicComplementaryRooms] = useState("");
+  const [clinicSpecialties, setClinicSpecialties] = useState("");
+
+  const [hotelSubtype, setHotelSubtype] = useState("");
+  const [hotelCategory, setHotelCategory] = useState("");
+  const [hotelBookingNote, setHotelBookingNote] = useState("");
+  const [hotelOperator, setHotelOperator] = useState("");
+  const [hotelInvestor, setHotelInvestor] = useState("");
+  const [hotelManager, setHotelManager] = useState("");
+  const [hotelRenovationDate, setHotelRenovationDate] = useState("");
+  const [hotelKeys, setHotelKeys] = useState("");
+  const [hotelFloors, setHotelFloors] = useState("");
+  const [hotelRooms, setHotelRooms] = useState<HotelRoomItem[]>([]);
+  const [hotelRoomInput, setHotelRoomInput] = useState<HotelRoomItem>({ type: "", count: "", surface: "" });
+  const [editingHotelRoomIndex, setEditingHotelRoomIndex] = useState<number | null>(null);
+  const [hotelFnB, setHotelFnB] = useState<HotelServiceItem[]>([]);
+  const [hotelFnBInput, setHotelFnBInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "" });
+  const [editingHotelFnBIndex, setEditingHotelFnBIndex] = useState<number | null>(null);
+  const [hotelMice, setHotelMice] = useState<HotelServiceItem[]>([]);
+  const [hotelMiceInput, setHotelMiceInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", roomsCount: "", surface: "" });
+  const [editingHotelMiceIndex, setEditingHotelMiceIndex] = useState<number | null>(null);
+  const [hotelLeisure, setHotelLeisure] = useState<HotelServiceItem[]>([]);
+  const [hotelLeisureInput, setHotelLeisureInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", count: "", surface: "" });
+  const [editingHotelLeisureIndex, setEditingHotelLeisureIndex] = useState<number | null>(null);
 
   // --- Map ---
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -468,8 +702,23 @@ export default function AddProjectScreen() {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+  const [notice, setNotice] = useState<NoticeState>({
+    visible: false,
+    type: "info",
+    title: "Information",
+    message: "",
+    primaryLabel: "OK",
+  });
   const mapRef = useRef<any | null>(null);
   const openLocationCode = new OpenLocationCode();
+
+  const showNotice = useCallback((payload: Omit<NoticeState, "visible">) => {
+    setNotice({ visible: true, ...payload });
+  }, []);
+
+  const closeNotice = useCallback(() => {
+    setNotice((previous) => ({ ...previous, visible: false }));
+  }, []);
 
   // --- Unités de surface ---
   const [unitTotalSurface, setUnitTotalSurface] = useState<"m²" | "ha">("m²");
@@ -479,9 +728,14 @@ export default function AddProjectScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (projectId) {
+      if (hasProjectId) {
         return;
       }
+
+      // Force create mode when no projectId is provided (tab screens keep state mounted).
+      setEditingProjectId(null);
+      setIsEditMode(false);
+      setIsLoadingProject(false);
 
       // Réinitialiser TOUS les champs pour un nouveau projet
       setShowMainTypeModal(true);
@@ -517,6 +771,14 @@ export default function AddProjectScreen() {
       // Dates
       setDeliveryDate("");
       setStartCommercialDate("");
+      setOpeningDate("");
+      setShowDeliveryDatePicker(false);
+      setShowStartCommercialDatePicker(false);
+      setShowOpeningDatePicker(false);
+      setDeliveryDateObj(null);
+      setStartCommercialDateObj(null);
+      setOpeningDateObj(null);
+      setActiveCalendar(null);
       
       // Commercialisation
       setCommercializationRateGlobal("");
@@ -574,11 +836,80 @@ export default function AddProjectScreen() {
       setPositionnement("");
       setMixRetail("");
       setEnseignes("");
+      setSourceLink("");
+      setPhotos([]);
+      setRetailTypology("");
+      setRetailNiveaux("");
+      setRetailCommerces("");
+      setRetailParkingPlaces("");
+      setRetailParkingType("");
+      setRetailParkingRatio("");
+      setRetailShoppingCount("");
+      setRetailShoppingBrands("");
+      setRetailFoodCount("");
+      setRetailFoodBrands("");
+      setRetailFoodTypologies([]);
+      setRetailServicesCount("");
+      setRetailServicesBrands("");
+      setRetailLeisureCount("");
+      setRetailLeisureBrands("");
+      setRetailMainTenants("");
+      setRetailOccupancyRate("");
+      setOfficeType("");
+      setOfficeConcept("");
+      setOfficeTarget("");
+      setOfficeServices("");
+      setOfficeSpaces([]);
+      setOfficeSpaceInput({
+        space: "",
+        description: "",
+        pricingMode: "from",
+        pricingMin: "",
+        pricingMax: "",
+        pricingUnit: "MAD",
+        pricingComment: "",
+      });
+      setEditingOfficeSpaceIndex(null);
+      setClinicTypology("");
+      setClinicDescription("");
+      setClinicBeds("");
+      setClinicDoctors("");
+      setClinicBedTypes([]);
+      setClinicDoctorTypes([]);
+      setClinicBedInput({ name: "", count: "" });
+      setClinicDoctorInput({ name: "", count: "" });
+      setEditingClinicBedIndex(null);
+      setEditingClinicDoctorIndex(null);
+      setClinicEquipments("");
+      setClinicOperatingBlocks("");
+      setClinicComplementaryRooms("");
+      setClinicSpecialties("");
+      setHotelSubtype("");
+      setHotelCategory("");
+      setHotelBookingNote("");
+      setHotelOperator("");
+      setHotelInvestor("");
+      setHotelManager("");
+      setHotelRenovationDate("");
+      setHotelKeys("");
+      setHotelFloors("");
+      setHotelRooms([]);
+      setHotelRoomInput({ type: "", count: "", surface: "" });
+      setEditingHotelRoomIndex(null);
+      setHotelFnB([]);
+      setHotelFnBInput({ name: "", type: "", capacity: "" });
+      setEditingHotelFnBIndex(null);
+      setHotelMice([]);
+      setHotelMiceInput({ name: "", type: "", capacity: "", roomsCount: "", surface: "" });
+      setEditingHotelMiceIndex(null);
+      setHotelLeisure([]);
+      setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "" });
+      setEditingHotelLeisureIndex(null);
       
       // Map
       setLatitude(null);
       setLongitude(null);
-    }, [projectId])
+    }, [hasProjectId])
   );
 
   const selectMainType = (type: string) => {
@@ -609,12 +940,19 @@ export default function AddProjectScreen() {
     if (projectType === "Villa") return ["Villa"];
     if (projectType === "Lot de villas") return ["Lot de villas"];
     if (projectType === "Retail") return ["Retail"];
+    if (projectType === "Bureau") return ["Bureau"];
+    if (projectType === "Santé") return ["Santé"];
+    if (projectType === "Hotel") return ["Hotel"];
     if (projectType === "Collectif/Villa") return ["Collectif", "Villa"];
     if (projectType === "Collectif/Lot de villas") return ["Collectif", "Lot de villas"];
     if (projectType === "Villa/Lot de villas") return ["Villa", "Lot de villas"];
     if (projectType === "Collectif/Villa/Lot de villas") return ["Collectif", "Villa", "Lot de villas"];
     return [];
   };
+
+  const isResidentialProject = ["Collectif", "Villa", "Lot de villas"].includes(projectType) || projectType.includes("/");
+  const showCommercialMetrics = isResidentialProject || projectType === "Retail";
+  const hideCommercialFields = ["Bureau", "Santé", "Hotel"].includes(projectType);
 
   // Fonction pour obtenir les typologies disponibles
   const getTypologiesForCategory = (category: string): string[] => {
@@ -627,11 +965,148 @@ export default function AddProjectScreen() {
     const quartierList = cityKey ? cityQuartiers[cityKey] ?? neighbourhoodOptions : neighbourhoodOptions;
     return filterSuggestions(quartier, quartierList);
   };
-  const getStatusSuggestions = () => filterSuggestions(status, statusOptions);
+  const getStatusSuggestions = () => filterSuggestions(status, getStatusOptionsByProjectType(projectType));
 
   const onSelectCity = (value: string) => {
     setCity(value);
     setActiveSuggestion(null);
+  };
+
+  const pickPhotosFromLibrary = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.75,
+    });
+
+    if (result.canceled) return;
+    const selected = result.assets.map((asset) => ({ uri: asset.uri }));
+    setPhotos((previous) => [...previous, ...selected]);
+  };
+
+  const takePhotoWithCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showNotice({
+        type: "warning",
+        title: "Autorisation caméra",
+        message: "Activez l'accès caméra pour prendre une photo.",
+        primaryLabel: "OK",
+      });
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.75,
+    });
+
+    if (result.canceled) return;
+    const photo = result.assets[0];
+    if (!photo?.uri) return;
+    setPhotos((previous) => [...previous, { uri: photo.uri }]);
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((previous) => previous.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const uploadPhotoAndGetUrl = async (projectId: string, uri: string, index: number) => {
+    const response = await fetch(uri);
+    const arrayBuffer = await response.arrayBuffer();
+    const extension = uri.split(".").pop()?.split("?")[0] || "jpg";
+    const filePath = `${projectId}/${Date.now()}-${index}.${extension}`;
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+
+    const { error: uploadError } = await supabase.storage
+      .from("project-images")
+      .upload(filePath, arrayBuffer, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType,
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data } = supabase.storage.from("project-images").getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
+  const addOrUpdateOfficeSpace = () => {
+    if (!officeSpaceInput.space.trim()) return;
+    if (!officeSpaceInput.pricingMin.trim()) return;
+    const next = upsertListItem(officeSpaces, officeSpaceInput, editingOfficeSpaceIndex);
+    setOfficeSpaces(next);
+    setOfficeSpaceInput({
+      space: "",
+      description: "",
+      pricingMode: "from",
+      pricingMin: "",
+      pricingMax: "",
+      pricingUnit: "MAD",
+      pricingComment: "",
+    });
+    setEditingOfficeSpaceIndex(null);
+  };
+
+  const formatOfficeSpacePricing = (space: OfficeSpaceItem) => {
+    if (space.pricingMode === "between" && space.pricingMin && space.pricingMax) {
+      return `Entre ${space.pricingMin} et ${space.pricingMax} ${space.pricingUnit}`;
+    }
+    if (space.pricingMin) {
+      return `A partir de ${space.pricingMin} ${space.pricingUnit}`;
+    }
+    return space.pricing || "";
+  };
+
+  const addOrUpdateClinicBedType = () => {
+    if (!clinicBedInput.name.trim()) return;
+    const next = upsertListItem(clinicBedTypes, clinicBedInput, editingClinicBedIndex);
+    setClinicBedTypes(next);
+    setClinicBedInput({ name: "", count: "" });
+    setEditingClinicBedIndex(null);
+  };
+
+  const addOrUpdateClinicDoctorType = () => {
+    if (!clinicDoctorInput.name.trim()) return;
+    const next = upsertListItem(clinicDoctorTypes, clinicDoctorInput, editingClinicDoctorIndex);
+    setClinicDoctorTypes(next);
+    setClinicDoctorInput({ name: "", count: "" });
+    setEditingClinicDoctorIndex(null);
+  };
+
+  const addOrUpdateHotelRoom = () => {
+    if (!hotelRoomInput.type.trim()) return;
+    const next = upsertListItem(hotelRooms, hotelRoomInput, editingHotelRoomIndex);
+    setHotelRooms(next);
+    setHotelRoomInput({ type: "", count: "", surface: "" });
+    setEditingHotelRoomIndex(null);
+  };
+
+  const addOrUpdateHotelFnB = () => {
+    if (!hotelFnBInput.name.trim()) return;
+    const next = upsertListItem(hotelFnB, hotelFnBInput, editingHotelFnBIndex);
+    setHotelFnB(next);
+    setHotelFnBInput({ name: "", type: "", capacity: "" });
+    setEditingHotelFnBIndex(null);
+  };
+
+  const addOrUpdateHotelMice = () => {
+    if (!hotelMiceInput.name.trim()) return;
+    const next = upsertListItem(hotelMice, hotelMiceInput, editingHotelMiceIndex);
+    setHotelMice(next);
+    setHotelMiceInput({ name: "", type: "", capacity: "", roomsCount: "", surface: "" });
+    setEditingHotelMiceIndex(null);
+  };
+
+  const addOrUpdateHotelLeisure = () => {
+    if (!hotelLeisureInput.name.trim()) return;
+    const next = upsertListItem(hotelLeisure, hotelLeisureInput, editingHotelLeisureIndex);
+    setHotelLeisure(next);
+    setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "" });
+    setEditingHotelLeisureIndex(null);
   };
 
   const loadProjectForEdit = async (id: string) => {
@@ -645,7 +1120,12 @@ export default function AddProjectScreen() {
 
       if (projectError || !projectData) {
         console.error("Erreur chargement projet", projectError);
-        Alert.alert("Erreur", "Impossible de charger le projet.");
+        showNotice({
+          type: "error",
+          title: "Erreur",
+          message: "Impossible de charger le projet.",
+          primaryLabel: "Fermer",
+        });
         return;
       }
 
@@ -659,6 +1139,7 @@ export default function AddProjectScreen() {
       setQuartier(projectData.quartier || "");
       setDeveloper(projectData.developer || "");
       setStatus(projectData.status || "");
+      setSourceLink(projectData.source_link || "");
       setStandingCible(projectData.standing_cible || "");
       setBusinessModel(projectData.business_model || "");
       setAmenities(projectData.amenities || []);
@@ -673,6 +1154,13 @@ export default function AddProjectScreen() {
       setTotalUnitsVillaLot(projectData.total_units_lot_villas?.toString() || "");
       setDeliveryDate(projectData.delivery_date || "");
       setStartCommercialDate(projectData.start_commercial_date || "");
+      setOpeningDate("");
+      setShowDeliveryDatePicker(false);
+      setShowStartCommercialDatePicker(false);
+      setShowOpeningDatePicker(false);
+      setDeliveryDateObj(projectData.delivery_date ? new Date(projectData.delivery_date) : null);
+      setStartCommercialDateObj(projectData.start_commercial_date ? new Date(projectData.start_commercial_date) : null);
+      setOpeningDateObj(null);
       setCommercializationRateGlobal(projectData.commercialization_rate_global?.toString() || "");
       setCommercializationRateCollectif(projectData.commercialization_rate_collectif?.toString() || "");
       setCommercializationRateVilla(projectData.commercialization_rate_villa?.toString() || "");
@@ -755,20 +1243,118 @@ export default function AddProjectScreen() {
         setPositionnement(retailData.positionnement || "");
         setMixRetail(retailData.mix_retail || "");
         setEnseignes(retailData.enseignes || "");
+        setOpeningDate(retailData.opening_date || "");
+        setOpeningDateObj(retailData.opening_date ? new Date(retailData.opening_date) : null);
+      }
+
+      const { data: mediaData } = await supabase
+        .from("projects_media")
+        .select("id, media_url")
+        .eq("project_id", id);
+
+      if (Array.isArray(mediaData)) {
+        setPhotos(mediaData.map((item: any) => ({ id: item.id, uri: item.media_url, isExisting: true })));
+      }
+
+      const { data: detailsData } = await supabase
+        .from("projects_extended_details")
+        .select("details")
+        .eq("project_id", id)
+        .single();
+
+      if (detailsData?.details) {
+        const details = detailsData.details as Record<string, any>;
+        const retail = details.retail || {};
+        const office = details.office || {};
+        const health = details.health || {};
+        const hotel = details.hotel || {};
+
+        setRetailTypology(retail.typology || "");
+        setRetailNiveaux(retail.niveaux || "");
+        setRetailCommerces(retail.commerces || "");
+        setRetailParkingPlaces(retail.parkingPlaces || "");
+        setRetailParkingType(retail.parkingType || "");
+        setRetailParkingRatio(retail.parkingRatio || "");
+        setRetailShoppingCount(retail.shoppingCount || "");
+        setRetailShoppingBrands(retail.shoppingBrands || "");
+        setRetailFoodCount(retail.foodCount || "");
+        setRetailFoodBrands(retail.foodBrands || "");
+        setRetailFoodTypologies(Array.isArray(retail.foodTypologies) ? retail.foodTypologies : []);
+        setRetailServicesCount(retail.servicesCount || "");
+        setRetailServicesBrands(retail.servicesBrands || "");
+        setRetailLeisureCount(retail.leisureCount || "");
+        setRetailLeisureBrands(retail.leisureBrands || "");
+        setRetailMainTenants(retail.mainTenants || "");
+        setRetailOccupancyRate(retail.occupancyRate || "");
+
+        setOfficeType(office.officeType || "");
+        setOfficeConcept(office.concept || "");
+        setOfficeTarget(office.target || "");
+        setOfficeServices(office.services || "");
+        setOfficeSpaces(
+          Array.isArray(office.spaces)
+            ? office.spaces.map((item: any) => ({
+                space: item.space || "",
+                description: item.description || "",
+                pricingMode: item.pricingMode === "between" ? "between" : "from",
+                pricingMin: item.pricingMin || item.pricing || "",
+                pricingMax: item.pricingMax || "",
+                pricingUnit: item.pricingUnit || "MAD",
+                pricingComment: item.pricingComment || "",
+                pricing: item.pricing || "",
+              }))
+            : []
+        );
+        setOpeningDate(office.openingDate || "");
+        setOpeningDateObj(office.openingDate ? new Date(office.openingDate) : null);
+
+        setClinicTypology(health.clinicTypology || "");
+        setClinicDescription(health.description || "");
+        setClinicBeds(health.beds || "");
+        setClinicDoctors(health.doctors || "");
+        setClinicBedTypes(Array.isArray(health.bedTypes) ? health.bedTypes : []);
+        setClinicDoctorTypes(Array.isArray(health.doctorTypes) ? health.doctorTypes : []);
+        setClinicEquipments(health.equipments || "");
+        setClinicOperatingBlocks(health.operatingBlocks || "");
+        setClinicComplementaryRooms(health.complementaryRooms || "");
+        setClinicSpecialties(health.specialties || "");
+        setOpeningDate(health.openingDate || "");
+        setOpeningDateObj(health.openingDate ? new Date(health.openingDate) : null);
+
+        setHotelSubtype(hotel.subtype || "");
+        setHotelCategory(hotel.category || "");
+        setHotelBookingNote(hotel.bookingNote || "");
+        setHotelOperator(hotel.operator || "");
+        setHotelInvestor(hotel.investor || "");
+        setHotelManager(hotel.manager || "");
+        setHotelRenovationDate(hotel.renovationDate || "");
+        setHotelKeys(hotel.keys || "");
+        setHotelFloors(hotel.floors || "");
+        setHotelRooms(Array.isArray(hotel.rooms) ? hotel.rooms : []);
+        setHotelFnB(Array.isArray(hotel.fnb) ? hotel.fnb : []);
+        setHotelMice(Array.isArray(hotel.mice) ? hotel.mice : []);
+        setHotelLeisure(Array.isArray(hotel.leisure) ? hotel.leisure : []);
+        setOpeningDate(hotel.openingDate || "");
+        setOpeningDateObj(hotel.openingDate ? new Date(hotel.openingDate) : null);
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Erreur", "Impossible de charger le projet.");
+      showNotice({
+        type: "error",
+        title: "Erreur",
+        message: "Impossible de charger le projet.",
+        primaryLabel: "Fermer",
+      });
     } finally {
       setIsLoadingProject(false);
     }
   };
 
   useEffect(() => {
-    if (projectId) {
+    if (hasProjectId && projectId) {
       loadProjectForEdit(projectId);
     }
-  }, [projectId]);
+  }, [hasProjectId, projectId]);
 
   const onSelectQuartier = (value: string) => {
     setQuartier(value);
@@ -780,7 +1366,7 @@ export default function AddProjectScreen() {
     setShowStatusSuggestions(false);
   };
 
-  if (projectId && isLoadingProject) {
+  if (hasProjectId && isLoadingProject) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={AppColors.primary.main} />
@@ -791,27 +1377,43 @@ export default function AddProjectScreen() {
 
   const getCalendarRows = (date: Date) => getCalendarMatrix(date);
 
-  const changeCalendarMonth = (type: "delivery" | "start", delta: number) => {
+  const changeCalendarMonth = (type: "delivery" | "start" | "opening", delta: number) => {
     if (type === "delivery") {
       const current = deliveryDateObj || new Date();
       setDeliveryDateObj(new Date(current.getFullYear(), current.getMonth() + delta, 1));
-    } else {
+      return;
+    }
+
+    if (type === "start") {
       const current = startCommercialDateObj || new Date();
       setStartCommercialDateObj(new Date(current.getFullYear(), current.getMonth() + delta, 1));
+      return;
     }
+
+    const openingCurrent = openingDateObj || new Date();
+    setOpeningDateObj(new Date(openingCurrent.getFullYear(), openingCurrent.getMonth() + delta, 1));
   };
 
-  const onCalendarDateSelect = (type: "delivery" | "start", date: Date) => {
+  const changeCalendarYear = (type: "delivery" | "start" | "opening", deltaYears: number) => {
+    changeCalendarMonth(type, deltaYears * 12);
+  };
+
+  const onCalendarDateSelect = (type: "delivery" | "start" | "opening", date: Date) => {
     const value = formatDate(date);
     if (type === "delivery") {
       setDeliveryDateObj(date);
       setDeliveryDate(value);
       setShowDeliveryDatePicker(false);
       setActiveCalendar(null);
-    } else {
+    } else if (type === "start") {
       setStartCommercialDateObj(date);
       setStartCommercialDate(value);
       setShowStartCommercialDatePicker(false);
+      setActiveCalendar(null);
+    } else {
+      setOpeningDateObj(date);
+      setOpeningDate(value);
+      setShowOpeningDatePicker(false);
       setActiveCalendar(null);
     }
   };
@@ -823,7 +1425,12 @@ export default function AddProjectScreen() {
     const categoryToUse = isMixedProject ? currentTypologyCategory : categories[0];
 
     if (!currentTypology || !categoryToUse) {
-      Alert.alert("Erreur", "Choisissez une catégorie et une typologie");
+      showNotice({
+        type: "warning",
+        title: "Erreur",
+        message: "Choisissez une catégorie et une typologie",
+        primaryLabel: "Compris",
+      });
       return;
     }
 
@@ -1016,7 +1623,12 @@ export default function AddProjectScreen() {
   const searchLocation = async () => {
     const query = locationQuery.trim();
     if (!query) {
-      Alert.alert("Recherche", "Entrez une adresse ou un lieu à rechercher.");
+      showNotice({
+        type: "info",
+        title: "Recherche",
+        message: "Entrez une adresse ou un lieu à rechercher.",
+        primaryLabel: "OK",
+      });
       return;
     }
 
@@ -1035,14 +1647,24 @@ export default function AddProjectScreen() {
       const results = await getPhotonResults(query);
       if (results.length === 0) {
         setLocationResults([]);
-        Alert.alert("Aucun résultat", "Aucun emplacement trouvé pour cette recherche.");
+        showNotice({
+          type: "warning",
+          title: "Aucun résultat",
+          message: "Aucun emplacement trouvé pour cette recherche.",
+          primaryLabel: "OK",
+        });
         return;
       }
 
       setLocationResults(results);
     } catch (error) {
       console.error("Location search error", error);
-      Alert.alert("Erreur", "Impossible de rechercher l'emplacement, réessayez.");
+      showNotice({
+        type: "error",
+        title: "Erreur",
+        message: "Impossible de rechercher l'emplacement, réessayez.",
+        primaryLabel: "Fermer",
+      });
       setLocationResults([]);
     } finally {
       setLoadingLocationSearch(false);
@@ -1053,7 +1675,12 @@ export default function AddProjectScreen() {
     const latitudeResult = parseFloat(result.lat);
     const longitudeResult = parseFloat(result.lon);
     if (Number.isNaN(latitudeResult) || Number.isNaN(longitudeResult)) {
-      Alert.alert("Erreur", "Coordonnées invalides pour ce résultat.");
+      showNotice({
+        type: "error",
+        title: "Erreur",
+        message: "Coordonnées invalides pour ce résultat.",
+        primaryLabel: "Fermer",
+      });
       return;
     }
 
@@ -1090,7 +1717,12 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
 
   const saveProject = async () => {
     if (!latitude || !longitude) {
-      Alert.alert("Erreur", "Place le projet sur la carte");
+      showNotice({
+        type: "warning",
+        title: "Erreur",
+        message: "Place le projet sur la carte",
+        primaryLabel: "Compris",
+      });
       return;
     }
 
@@ -1100,7 +1732,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
     const normalizedProjectComponents = [...projectComponents];
     if (projectComponentsCustom.trim()) normalizedProjectComponents.push(projectComponentsCustom.trim());
 
-    const projectData = {
+    const projectDataBase = {
       name,
       city,
       quartier,
@@ -1111,7 +1743,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
       status,
       standing_cible: standingCible || null,
       business_model: businessModel === "autre" ? (businessModelCustom || null) : businessModel || null,
-      amenities: normalizedAmenities.length ? normalizedAmenities : null,
+      amenities: isResidentialProject && normalizedAmenities.length ? normalizedAmenities : null,
       project_components: normalizedProjectComponents.length ? normalizedProjectComponents : null,
       surface_fonciere_totale: convertToM2ForDatabase(surfaceFonciereTotal, unitTotalSurface),
       surface_fonciere_collectif: convertToM2ForDatabase(surfaceFonciereCollectif, unitCollectifSurface),
@@ -1136,40 +1768,57 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
       units_remaining_villa: parseInt(unitsRemainingVilla) || null,
       units_remaining_lot_villas: parseInt(unitsRemainingVillaLot) || null,
     };
+    const projectData = {
+      ...projectDataBase,
+      source_link: sourceLink || null,
+    } as any;
 
     let projectIdToUse = editingProjectId;
-    let projectResponse;
 
-    if (isEditMode && editingProjectId) {
-      const { data, error } = await supabase
-        .from("projects")
-        .update(projectData)
-        .eq("id", editingProjectId)
-        .select();
-
-      if (error) {
-        Alert.alert("Erreur", error.message);
-        return;
+    const saveProjectRow = async (payload: any) => {
+      if (isEditMode && editingProjectId) {
+        return await supabase
+          .from("projects")
+          .update(payload)
+          .eq("id", editingProjectId)
+          .select();
       }
 
-      projectResponse = data;
-    } else {
-      const { data, error } = await supabase
+      return await supabase
         .from("projects")
-        .insert([projectData])
+        .insert([payload])
         .select();
+    };
 
-      if (error) {
-        Alert.alert("Erreur", error.message);
-        return;
-      }
+    let { data: projectResponse, error: projectSaveError } = await saveProjectRow(projectData);
 
-      projectResponse = data;
-      projectIdToUse = (data && data[0]?.id) || null;
+    if (projectSaveError && String(projectSaveError.message).toLowerCase().includes("source_link")) {
+      const retry = await saveProjectRow(projectDataBase);
+      projectResponse = retry.data;
+      projectSaveError = retry.error;
+    }
+
+    if (projectSaveError) {
+      showNotice({
+        type: "error",
+        title: "Erreur",
+        message: projectSaveError.message,
+        primaryLabel: "Fermer",
+      });
+      return;
+    }
+
+    if (!isEditMode) {
+      projectIdToUse = (projectResponse && projectResponse[0]?.id) || null;
     }
 
     if (!projectIdToUse) {
-      Alert.alert("Erreur", "Impossible de récupérer l'ID du projet.");
+      showNotice({
+        type: "error",
+        title: "Erreur",
+        message: "Impossible de récupérer l'ID du projet.",
+        primaryLabel: "Fermer",
+      });
       return;
     }
 
@@ -1249,6 +1898,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
       await supabase.from("projects_retail").delete().eq("project_id", projectIdToUse);
       await supabase.from("projects_retail").insert([{
         project_id: projectIdToUse,
+        opening_date: openingDate || null,
         gla: parseFloat(gla),
         positionnement,
         mix_retail: mixRetail,
@@ -1256,8 +1906,126 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
       }]);
     }
 
-    showSaveSuccessMessage(isEditMode ? "Projet mis à jour !" : "Projet ajouté !");
-    router.replace("/(tabs)/explore");
+    const extendedDetailsPayload = {
+      retail: {
+        typology: retailTypology,
+        niveaux: retailNiveaux,
+        parkingPlaces: retailParkingPlaces,
+        parkingType: retailParkingType,
+        parkingRatio: retailParkingRatio,
+        shoppingCount: retailShoppingCount,
+        shoppingBrands: retailShoppingBrands,
+        foodCount: retailFoodCount,
+        foodBrands: retailFoodBrands,
+        foodTypologies: retailFoodTypologies,
+        servicesCount: retailServicesCount,
+        servicesBrands: retailServicesBrands,
+        leisureCount: retailLeisureCount,
+        leisureBrands: retailLeisureBrands,
+        mainTenants: retailMainTenants,
+        occupancyRate: retailOccupancyRate,
+      },
+      office: {
+        officeType,
+        concept: officeConcept,
+        target: officeTarget,
+        services: officeServices,
+        spaces: officeSpaces,
+        openingDate,
+      },
+      health: {
+        clinicTypology,
+        description: clinicDescription,
+        beds: clinicBeds,
+        bedTypes: clinicBedTypes,
+        doctors: clinicDoctors,
+        doctorTypes: clinicDoctorTypes,
+        equipments: clinicEquipments,
+        operatingBlocks: clinicOperatingBlocks,
+        complementaryRooms: clinicComplementaryRooms,
+        specialties: clinicSpecialties,
+        openingDate,
+      },
+      hotel: {
+        subtype: hotelSubtype,
+        category: hotelCategory,
+        bookingNote: hotelBookingNote,
+        operator: hotelOperator,
+        investor: hotelInvestor,
+        manager: hotelManager,
+        renovationDate: hotelRenovationDate,
+        keys: hotelKeys,
+        floors: hotelFloors,
+        rooms: hotelRooms,
+        fnb: hotelFnB,
+        mice: hotelMice,
+        leisure: hotelLeisure,
+        openingDate,
+      },
+    };
+
+    const { error: detailsError } = await supabase
+      .from("projects_extended_details")
+      .upsert(
+        [{
+          project_id: projectIdToUse,
+          project_type: projectType,
+          details: extendedDetailsPayload,
+        }],
+        { onConflict: "project_id" }
+      );
+
+    if (detailsError) {
+      console.warn("Extended details not saved", detailsError);
+    }
+
+    setIsUploadingPhotos(true);
+    try {
+      await supabase.from("projects_media").delete().eq("project_id", projectIdToUse);
+
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < photos.length; i += 1) {
+        const photo = photos[i];
+        if (photo.isExisting) {
+          uploadedUrls.push(photo.uri);
+          continue;
+        }
+        const uploadedUrl = await uploadPhotoAndGetUrl(projectIdToUse, photo.uri, i);
+        uploadedUrls.push(uploadedUrl);
+      }
+
+      if (uploadedUrls.length > 0) {
+        const { error: mediaInsertError } = await supabase.from("projects_media").insert(
+          uploadedUrls.map((mediaUrl) => ({
+            project_id: projectIdToUse,
+            media_url: mediaUrl,
+            media_type: "image",
+          }))
+        );
+        if (mediaInsertError) {
+          throw mediaInsertError;
+        }
+      }
+    } catch (mediaError) {
+      console.warn("Project photos not fully saved", mediaError);
+      const mediaErrorMessage = mediaError instanceof Error ? mediaError.message : "Upload images impossible";
+      showNotice({
+        type: "warning",
+        title: "Images non sauvegardees",
+        message: `Le projet est enregistre, mais les images ne sont pas passees. ${mediaErrorMessage}`,
+        primaryLabel: "OK",
+      });
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+
+    showNotice({
+      type: "success",
+      title: "Succès",
+      message: isEditMode ? "Projet mis à jour !" : "Projet ajouté !",
+      primaryLabel: "Voir sur la carte",
+      onPrimary: () => router.replace("/(tabs)/explore"),
+    });
   };
 
   return (
@@ -1574,17 +2342,17 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             style={styles.input}
             activeOpacity={0.8}
             onPress={() => {
-              setShowStartCommercialDatePicker(true);
-              setActiveCalendar("start");
-              if (!startCommercialDateObj) setStartCommercialDateObj(new Date());
+              setShowOpeningDatePicker(true);
+              setActiveCalendar("opening");
+              if (!openingDateObj) setOpeningDateObj(new Date());
             }}
           >
-            <Text style={[styles.dateInputText, !startCommercialDate && styles.placeholderText]}>
-              {startCommercialDate || "Début commercialisation"}
+            <Text style={[styles.dateInputText, !openingDate && styles.placeholderText]}>
+              {openingDate || "Date d'ouverture"}
             </Text>
           </TouchableOpacity>
 
-          {(showDeliveryDatePicker || showStartCommercialDatePicker) && (
+          {(showDeliveryDatePicker || showStartCommercialDatePicker || showOpeningDatePicker) && (
             <Modal transparent animationType="fade">
               <View style={styles.calendarModalOverlay}>
                 <View style={styles.calendarModal}>
@@ -1593,7 +2361,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                       style={styles.calendarNavButton}
                       onPress={() => {
                         if (activeCalendar === "delivery") changeCalendarMonth("delivery", -1);
-                        else changeCalendarMonth("start", -1);
+                        else if (activeCalendar === "start") changeCalendarMonth("start", -1);
+                        else changeCalendarMonth("opening", -1);
                       }}
                     >
                       <Text style={styles.calendarNavButtonText}>{"<"}</Text>
@@ -1601,16 +2370,62 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <Text style={styles.calendarTitle}>
                       {activeCalendar === "delivery"
                         ? `${monthNames[(deliveryDateObj || new Date()).getMonth()]} ${(deliveryDateObj || new Date()).getFullYear()}`
-                        : `${monthNames[(startCommercialDateObj || new Date()).getMonth()]} ${(startCommercialDateObj || new Date()).getFullYear()}`}
+                        : activeCalendar === "start"
+                          ? `${monthNames[(startCommercialDateObj || new Date()).getMonth()]} ${(startCommercialDateObj || new Date()).getFullYear()}`
+                          : `${monthNames[(openingDateObj || new Date()).getMonth()]} ${(openingDateObj || new Date()).getFullYear()}`}
                     </Text>
                     <TouchableOpacity
                       style={styles.calendarNavButton}
                       onPress={() => {
                         if (activeCalendar === "delivery") changeCalendarMonth("delivery", 1);
-                        else changeCalendarMonth("start", 1);
+                        else if (activeCalendar === "start") changeCalendarMonth("start", 1);
+                        else changeCalendarMonth("opening", 1);
                       }}
                     >
                       <Text style={styles.calendarNavButtonText}>{">"}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.calendarQuickActionsRow}>
+                    <TouchableOpacity
+                      style={styles.calendarQuickButton}
+                      onPress={() => {
+                        if (activeCalendar === "delivery") changeCalendarYear("delivery", -5);
+                        else if (activeCalendar === "start") changeCalendarYear("start", -5);
+                        else changeCalendarYear("opening", -5);
+                      }}
+                    >
+                      <Text style={styles.calendarQuickButtonText}>-5 ans</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.calendarQuickButton}
+                      onPress={() => {
+                        if (activeCalendar === "delivery") changeCalendarYear("delivery", -1);
+                        else if (activeCalendar === "start") changeCalendarYear("start", -1);
+                        else changeCalendarYear("opening", -1);
+                      }}
+                    >
+                      <Text style={styles.calendarQuickButtonText}>-1 an</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.calendarQuickButton}
+                      onPress={() => {
+                        if (activeCalendar === "delivery") changeCalendarYear("delivery", 1);
+                        else if (activeCalendar === "start") changeCalendarYear("start", 1);
+                        else changeCalendarYear("opening", 1);
+                      }}
+                    >
+                      <Text style={styles.calendarQuickButtonText}>+1 an</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.calendarQuickButton}
+                      onPress={() => {
+                        if (activeCalendar === "delivery") changeCalendarYear("delivery", 5);
+                        else if (activeCalendar === "start") changeCalendarYear("start", 5);
+                        else changeCalendarYear("opening", 5);
+                      }}
+                    >
+                      <Text style={styles.calendarQuickButtonText}>+5 ans</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -1622,13 +2437,19 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     ))}
                   </View>
 
-                  {(activeCalendar === "delivery" ? getCalendarRows(deliveryDateObj || new Date()) : getCalendarRows(startCommercialDateObj || new Date())).map((week, weekIndex) => (
+                  {(activeCalendar === "delivery"
+                    ? getCalendarRows(deliveryDateObj || new Date())
+                    : activeCalendar === "start"
+                      ? getCalendarRows(startCommercialDateObj || new Date())
+                      : getCalendarRows(openingDateObj || new Date())).map((week, weekIndex) => (
                     <View key={weekIndex} style={styles.calendarRow}>
                       {week.map((day, dayIndex) => {
                         const isSelected = day
                           ? (activeCalendar === "delivery"
                               ? deliveryDate === formatDate(day)
-                              : startCommercialDate === formatDate(day))
+                              : activeCalendar === "start"
+                                ? startCommercialDate === formatDate(day)
+                                : openingDate === formatDate(day))
                           : false;
                         return (
                           <TouchableOpacity
@@ -1655,6 +2476,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     onPress={() => {
                       setShowDeliveryDatePicker(false);
                       setShowStartCommercialDatePicker(false);
+                      setShowOpeningDatePicker(false);
                       setActiveCalendar(null);
                     }}
                   >
@@ -1665,133 +2487,137 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             </Modal>
           )}
 
-          {/* Commercialisation */}
-          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
-            Commercialisation
-          </ThemedText>
+          {showCommercialMetrics && !hideCommercialFields && (
+            <>
+              {/* Commercialisation */}
+              <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+                Commercialisation
+              </ThemedText>
 
-          <TextInput
-            placeholder="Taux commercialisation global"
-            style={styles.input}
-            value={commercializationRateGlobal ? `${commercializationRateGlobal}%` : ""}
-            onChangeText={(text) => setCommercializationRateGlobal(cleanupPercentValue(text))}
-            keyboardType="numeric"
-          />
+              <TextInput
+                placeholder="Taux commercialisation global"
+                style={styles.input}
+                value={commercializationRateGlobal ? `${commercializationRateGlobal}%` : ""}
+                onChangeText={(text) => setCommercializationRateGlobal(cleanupPercentValue(text))}
+                keyboardType="numeric"
+              />
 
-          {isMixedProject && categories.includes("Collectif") && (
-            <TextInput
-              placeholder="Taux commercialisation Collectif"
-              style={styles.input}
-              value={commercializationRateCollectif ? `${commercializationRateCollectif}%` : ""}
-              onChangeText={(text) => setCommercializationRateCollectif(cleanupPercentValue(text))}
-              keyboardType="numeric"
-            />
-          )}
+              {isMixedProject && categories.includes("Collectif") && (
+                <TextInput
+                  placeholder="Taux commercialisation Collectif"
+                  style={styles.input}
+                  value={commercializationRateCollectif ? `${commercializationRateCollectif}%` : ""}
+                  onChangeText={(text) => setCommercializationRateCollectif(cleanupPercentValue(text))}
+                  keyboardType="numeric"
+                />
+              )}
 
-          {isMixedProject && categories.includes("Villa") && (
-            <TextInput
-              placeholder="Taux commercialisation Villa"
-              style={styles.input}
-              value={commercializationRateVilla ? `${commercializationRateVilla}%` : ""}
-              onChangeText={(text) => setCommercializationRateVilla(cleanupPercentValue(text))}
-              keyboardType="numeric"
-            />
-          )}
+              {isMixedProject && categories.includes("Villa") && (
+                <TextInput
+                  placeholder="Taux commercialisation Villa"
+                  style={styles.input}
+                  value={commercializationRateVilla ? `${commercializationRateVilla}%` : ""}
+                  onChangeText={(text) => setCommercializationRateVilla(cleanupPercentValue(text))}
+                  keyboardType="numeric"
+                />
+              )}
 
-          {isMixedProject && categories.includes("Lot de villas") && (
-            <TextInput
-              placeholder="Taux commercialisation Lot de villas"
-              style={styles.input}
-              value={commercializationRateVillaLot ? `${commercializationRateVillaLot}%` : ""}
-              onChangeText={(text) => setCommercializationRateVillaLot(cleanupPercentValue(text))}
-              keyboardType="numeric"
-            />
-          )}
+              {isMixedProject && categories.includes("Lot de villas") && (
+                <TextInput
+                  placeholder="Taux commercialisation Lot de villas"
+                  style={styles.input}
+                  value={commercializationRateVillaLot ? `${commercializationRateVillaLot}%` : ""}
+                  onChangeText={(text) => setCommercializationRateVillaLot(cleanupPercentValue(text))}
+                  keyboardType="numeric"
+                />
+              )}
 
-          {/* Taux d'écoulement */}
-          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
-            Taux d'Écoulement (unité/mois)
-          </ThemedText>
+              {/* Taux d'écoulement */}
+              <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+                Taux d'Écoulement (unité/mois)
+              </ThemedText>
 
-          <TextInput
-            placeholder="Taux d'écoulement global (unité/mois)"
-            style={styles.input}
-            value={salesVelocityGlobal ? `${salesVelocityGlobal} unité/mois` : ""}
-            onChangeText={(text) => setSalesVelocityGlobal(cleanupPercentValue(text))}
-          />
+              <TextInput
+                placeholder="Taux d'écoulement global (unité/mois)"
+                style={styles.input}
+                value={salesVelocityGlobal ? `${salesVelocityGlobal} unité/mois` : ""}
+                onChangeText={(text) => setSalesVelocityGlobal(cleanupPercentValue(text))}
+              />
 
-          {isMixedProject && categories.includes("Collectif") && (
-            <TextInput
-              placeholder="Taux d'écoulement Collectif (unité/mois)"
-              style={styles.input}
-              value={salesVelocityCollectif ? `${salesVelocityCollectif} unité/mois` : ""}
-              onChangeText={(text) => setSalesVelocityCollectif(cleanupPercentValue(text))}
-            />
-          )}
+              {isMixedProject && categories.includes("Collectif") && (
+                <TextInput
+                  placeholder="Taux d'écoulement Collectif (unité/mois)"
+                  style={styles.input}
+                  value={salesVelocityCollectif ? `${salesVelocityCollectif} unité/mois` : ""}
+                  onChangeText={(text) => setSalesVelocityCollectif(cleanupPercentValue(text))}
+                />
+              )}
 
-          {isMixedProject && categories.includes("Villa") && (
-            <TextInput
-              placeholder="Taux d'écoulement Villa (unité/mois)"
-              style={styles.input}
-              value={salesVelocityVilla ? `${salesVelocityVilla} unité/mois` : ""}
-              onChangeText={(text) => setSalesVelocityVilla(cleanupPercentValue(text))}
-            />
-          )}
+              {isMixedProject && categories.includes("Villa") && (
+                <TextInput
+                  placeholder="Taux d'écoulement Villa (unité/mois)"
+                  style={styles.input}
+                  value={salesVelocityVilla ? `${salesVelocityVilla} unité/mois` : ""}
+                  onChangeText={(text) => setSalesVelocityVilla(cleanupPercentValue(text))}
+                />
+              )}
 
-          {isMixedProject && categories.includes("Lot de villas") && (
-            <TextInput
-              placeholder="Taux d'écoulement Lot de villas (unité/mois)"
-              style={styles.input}
-              value={salesVelocityVillaLot ? `${salesVelocityVillaLot} unité/mois` : ""}
-              onChangeText={(text) => setSalesVelocityVillaLot(cleanupPercentValue(text))}
-            />
-          )}
+              {isMixedProject && categories.includes("Lot de villas") && (
+                <TextInput
+                  placeholder="Taux d'écoulement Lot de villas (unité/mois)"
+                  style={styles.input}
+                  value={salesVelocityVillaLot ? `${salesVelocityVillaLot} unité/mois` : ""}
+                  onChangeText={(text) => setSalesVelocityVillaLot(cleanupPercentValue(text))}
+                />
+              )}
 
-          {/* Unités Restantes */}
-          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
-            Unités Restantes
-          </ThemedText>
+              {/* Unités Restantes */}
+              <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+                Unités Restantes
+              </ThemedText>
 
-          <TextInput
-            placeholder="Unités restantes global"
-            style={styles.input}
-            value={unitsRemainingGlobal}
-            onChangeText={setUnitsRemainingGlobal}
-            keyboardType="decimal-pad"
-          />
+              <TextInput
+                placeholder="Unités restantes global"
+                style={styles.input}
+                value={unitsRemainingGlobal}
+                onChangeText={setUnitsRemainingGlobal}
+                keyboardType="decimal-pad"
+              />
 
-          {isMixedProject && categories.includes("Collectif") && (
-            <TextInput
-              placeholder="Unités restantes Collectif"
-              style={styles.input}
-              value={unitsRemainingCollectif}
-              onChangeText={setUnitsRemainingCollectif}
-              keyboardType="decimal-pad"
-            />
-          )}
+              {isMixedProject && categories.includes("Collectif") && (
+                <TextInput
+                  placeholder="Unités restantes Collectif"
+                  style={styles.input}
+                  value={unitsRemainingCollectif}
+                  onChangeText={setUnitsRemainingCollectif}
+                  keyboardType="decimal-pad"
+                />
+              )}
 
-          {isMixedProject && categories.includes("Villa") && (
-            <TextInput
-              placeholder="Unités restantes Villa"
-              style={styles.input}
-              value={unitsRemainingVilla}
-              onChangeText={setUnitsRemainingVilla}
-              keyboardType="decimal-pad"
-            />
-          )}
+              {isMixedProject && categories.includes("Villa") && (
+                <TextInput
+                  placeholder="Unités restantes Villa"
+                  style={styles.input}
+                  value={unitsRemainingVilla}
+                  onChangeText={setUnitsRemainingVilla}
+                  keyboardType="decimal-pad"
+                />
+              )}
 
-          {isMixedProject && categories.includes("Lot de villas") && (
-            <TextInput
-              placeholder="Unités restantes Lot de villas"
-              style={styles.input}
-              value={unitsRemainingVillaLot}
-              onChangeText={setUnitsRemainingVillaLot}
-              keyboardType="decimal-pad"
-            />
+              {isMixedProject && categories.includes("Lot de villas") && (
+                <TextInput
+                  placeholder="Unités restantes Lot de villas"
+                  style={styles.input}
+                  value={unitsRemainingVillaLot}
+                  onChangeText={setUnitsRemainingVillaLot}
+                  keyboardType="decimal-pad"
+                />
+              )}
+            </>
           )}
 
           {/* Typologies */}
-          {projectType !== "Retail" && (
+          {(isMixedProject || ["Collectif", "Villa", "Lot de villas"].includes(projectType)) && (
             <>
               <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
                 Ajouter une Typologie
@@ -2038,33 +2864,37 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             </>
           )}
 
-          <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
-            Amenities du résidentiel
-          </ThemedText>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-            {residentialAmenitiesOptions.map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={{
-                  paddingVertical: 10,
-                  paddingHorizontal: 12,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: amenities.includes(option) ? AppColors.primary.main : AppColors.gray.lighter,
-                  backgroundColor: amenities.includes(option) ? AppColors.primary.light + "30" : AppColors.ui.background,
-                }}
-                onPress={() => toggleSelection(option, amenities, setAmenities)}
-              >
-                <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{option}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          <TextInput
-            placeholder="Autre amenity"
-            style={styles.input}
-            value={amenitiesCustom}
-            onChangeText={setAmenitiesCustom}
-          />
+          {isResidentialProject && (
+            <>
+              <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
+                Amenities du résidentiel
+              </ThemedText>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                {residentialAmenitiesOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={{
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: amenities.includes(option) ? AppColors.primary.main : AppColors.gray.lighter,
+                      backgroundColor: amenities.includes(option) ? AppColors.primary.light + "30" : AppColors.ui.background,
+                    }}
+                    onPress={() => toggleSelection(option, amenities, setAmenities)}
+                  >
+                    <Text style={{ color: AppColors.primary.main, fontWeight: "600" }}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                placeholder="Autre amenity"
+                style={styles.input}
+                value={amenitiesCustom}
+                onChangeText={setAmenitiesCustom}
+              />
+            </>
+          )}
 
           <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
             Composantes du projet
@@ -2097,10 +2927,330 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           {/* Retail */}
           {projectType === "Retail" && (
             <>
-              <TextInput placeholder="GLA" style={styles.input} onChangeText={setGla} />
-              <TextInput placeholder="Positionnement" style={styles.input} onChangeText={setPositionnement} />
-              <TextInput placeholder="Mix retail" style={styles.input} onChangeText={setMixRetail} />
-              <TextInput placeholder="Enseignes" style={styles.input} onChangeText={setEnseignes} />
+              <ThemedText style={styles.sectionTitle}>Retail - Informations générales</ThemedText>
+              <TextInput placeholder="Typologie retail (centre urbain, proximité...)" style={styles.input} value={retailTypology} onChangeText={setRetailTypology} />
+              <Text style={styles.fieldLabel}>Typologie de retail (sélection rapide)</Text>
+              <View style={styles.chipsRow}>
+                {retailTypologyOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.optionChip, retailTypology === option && styles.optionChipActive]}
+                    onPress={() => setRetailTypology(option)}
+                  >
+                    <Text style={[styles.optionChipText, retailTypology === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <ThemedText style={styles.sectionTitle}>Retail - Caractéristiques physiques</ThemedText>
+              <TextInput
+                placeholder="Surface GLA (m²)"
+                style={styles.input}
+                value={gla ? `${gla} m²` : ""}
+                onChangeText={(text) => setGla(cleanupPercentValue(text))}
+                keyboardType="decimal-pad"
+              />
+              <TextInput placeholder="Nombre de niveaux (ex: RDC + 1)" style={styles.input} value={retailNiveaux} onChangeText={setRetailNiveaux} />
+              <TextInput placeholder="Nombre de places de parking" style={styles.input} value={retailParkingPlaces} onChangeText={setRetailParkingPlaces} keyboardType="decimal-pad" />
+              <TextInput placeholder="Parking (ex: Souterrain)" style={styles.input} value={retailParkingType} onChangeText={setRetailParkingType} />
+              <TextInput placeholder="Ratio parking (ex: 3.25 places /100 m² GLA)" style={styles.input} value={retailParkingRatio} onChangeText={setRetailParkingRatio} />
+
+              <ThemedText style={styles.sectionTitle}>Positionnement & Mix commercial</ThemedText>
+              <TextInput placeholder="Positionnement" style={styles.input} value={positionnement} onChangeText={setPositionnement} multiline />
+              <TextInput placeholder="Mix commercial" style={styles.input} value={mixRetail} onChangeText={setMixRetail} multiline />
+
+              <ThemedText style={styles.subSectionTitle}>Shopping</ThemedText>
+              <TextInput placeholder="Nombre d'enseignes" style={styles.input} value={retailShoppingCount} onChangeText={setRetailShoppingCount} keyboardType="decimal-pad" />
+              <TextInput placeholder="Enseignes" style={styles.input} value={retailShoppingBrands} onChangeText={setRetailShoppingBrands} multiline />
+
+              <ThemedText style={styles.subSectionTitle}>Food & Beverage</ThemedText>
+              <TextInput placeholder="Nombre d'enseignes" style={styles.input} value={retailFoodCount} onChangeText={setRetailFoodCount} keyboardType="decimal-pad" />
+              <Text style={styles.fieldLabel}>Typologies F&B (sélection multiple)</Text>
+              <View style={styles.chipsRow}>
+                {retailFoodTypeOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.optionChip, retailFoodTypologies.includes(option) && styles.optionChipActive]}
+                    onPress={() => toggleSelection(option, retailFoodTypologies, setRetailFoodTypologies)}
+                  >
+                    <Text style={[styles.optionChipText, retailFoodTypologies.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Enseignes" style={styles.input} value={retailFoodBrands} onChangeText={setRetailFoodBrands} multiline />
+
+              <ThemedText style={styles.subSectionTitle}>Services</ThemedText>
+              <TextInput placeholder="Nombre d'enseignes" style={styles.input} value={retailServicesCount} onChangeText={setRetailServicesCount} keyboardType="decimal-pad" />
+              <TextInput placeholder="Enseignes" style={styles.input} value={retailServicesBrands} onChangeText={setRetailServicesBrands} multiline />
+
+              <ThemedText style={styles.subSectionTitle}>Loisirs</ThemedText>
+              <TextInput placeholder="Nombre d'enseignes" style={styles.input} value={retailLeisureCount} onChangeText={setRetailLeisureCount} keyboardType="decimal-pad" />
+              <TextInput placeholder="Enseignes" style={styles.input} value={retailLeisureBrands} onChangeText={setRetailLeisureBrands} multiline />
+
+              <TextInput placeholder="Locataires principaux" style={styles.input} value={retailMainTenants} onChangeText={setRetailMainTenants} multiline />
+              <TextInput
+                placeholder="Taux d'occupation (%)"
+                style={styles.input}
+                value={retailOccupancyRate ? `${retailOccupancyRate}%` : ""}
+                onChangeText={(text) => setRetailOccupancyRate(cleanupPercentValue(text))}
+                keyboardType="decimal-pad"
+              />
+              <TextInput placeholder="Enseignes (résumé)" style={styles.input} value={enseignes} onChangeText={setEnseignes} multiline />
+            </>
+          )}
+
+          {projectType === "Bureau" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Bureau</ThemedText>
+              <TextInput placeholder="Type de bureau (coworking, centre d'affaires...)" style={styles.input} value={officeType} onChangeText={setOfficeType} />
+              <TextInput placeholder="Concept" style={styles.input} value={officeConcept} onChangeText={setOfficeConcept} multiline />
+              <TextInput placeholder="Cible" style={styles.input} value={officeTarget} onChangeText={setOfficeTarget} />
+              <TextInput placeholder="Services" style={styles.input} value={officeServices} onChangeText={setOfficeServices} multiline />
+
+              <ThemedText style={styles.subSectionTitle}>Espaces de travail</ThemedText>
+              <TextInput
+                placeholder="Nom espace (ex: Open Office)"
+                style={styles.input}
+                value={officeSpaceInput.space}
+                onChangeText={(text) => setOfficeSpaceInput((previous) => ({ ...previous, space: text }))}
+              />
+              <TextInput
+                placeholder="Description"
+                style={styles.input}
+                value={officeSpaceInput.description}
+                onChangeText={(text) => setOfficeSpaceInput((previous) => ({ ...previous, description: text }))}
+              />
+              <Text style={styles.fieldLabel}>Prix de location</Text>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                {(["from", "between"] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: officeSpaceInput.pricingMode === mode ? AppColors.primary.main : AppColors.gray.lighter,
+                      backgroundColor: officeSpaceInput.pricingMode === mode ? AppColors.primary.light : AppColors.ui.background,
+                      alignItems: "center",
+                    }}
+                    onPress={() => setOfficeSpaceInput((previous) => ({ ...previous, pricingMode: mode }))}
+                  >
+                    <Text style={{ color: officeSpaceInput.pricingMode === mode ? AppColors.ui.background : AppColors.ui.text, fontWeight: "700" }}>
+                      {mode === "from" ? "A partir" : "Entre"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={{ flexDirection: "row", gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  placeholder="Prix min"
+                  style={[styles.input, { flex: 1 }]}
+                  value={officeSpaceInput.pricingMin}
+                  onChangeText={(text) => setOfficeSpaceInput((previous) => ({ ...previous, pricingMin: text }))}
+                  keyboardType="decimal-pad"
+                />
+                {officeSpaceInput.pricingMode === "between" && (
+                  <TextInput
+                    placeholder="Prix max"
+                    style={[styles.input, { flex: 1 }]}
+                    value={officeSpaceInput.pricingMax}
+                    onChangeText={(text) => setOfficeSpaceInput((previous) => ({ ...previous, pricingMax: text }))}
+                    keyboardType="decimal-pad"
+                  />
+                )}
+              </View>
+              <TextInput
+                placeholder="Unité prix (MAD, MMAD, etc.)"
+                style={styles.input}
+                value={officeSpaceInput.pricingUnit}
+                onChangeText={(text) => setOfficeSpaceInput((previous) => ({ ...previous, pricingUnit: text }))}
+              />
+              <TextInput
+                placeholder="Commentaire prix (optionnel)"
+                style={styles.input}
+                value={officeSpaceInput.pricingComment || ""}
+                onChangeText={(text) => setOfficeSpaceInput((previous) => ({ ...previous, pricingComment: text }))}
+              />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateOfficeSpace}>
+                <Text style={styles.inlineAddButtonText}>{editingOfficeSpaceIndex === null ? "Ajouter espace" : "Modifier espace"}</Text>
+              </TouchableOpacity>
+              {officeSpaces.map((item, index) => (
+                <View key={`${item.space}-${index}`} style={styles.inlineCard}>
+                  <Text style={styles.inlineCardTitle}>{item.space}</Text>
+                  <Text style={styles.inlineCardText}>{item.description}</Text>
+                  <Text style={styles.inlineCardText}>{formatOfficeSpacePricing(item)}</Text>
+                  {item.pricingComment ? <Text style={styles.inlineCardText}>{item.pricingComment}</Text> : null}
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setOfficeSpaceInput(item); setEditingOfficeSpaceIndex(index); }}>
+                      <Text style={styles.inlineActionEdit}>Modifier</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setOfficeSpaces((previous) => previous.filter((_, i) => i !== index))}>
+                      <Text style={styles.inlineActionDelete}>Supprimer</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
+
+          {projectType === "Santé" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Santé</ThemedText>
+              <TextInput placeholder="Typologie de clinique" style={styles.input} value={clinicTypology} onChangeText={setClinicTypology} />
+              <Text style={styles.fieldLabel}>Typologie (sélection rapide)</Text>
+              <View style={styles.chipsRow}>
+                {clinicTypologyOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.optionChip, clinicTypology === option && styles.optionChipActive]}
+                    onPress={() => setClinicTypology(option)}
+                  >
+                    <Text style={[styles.optionChipText, clinicTypology === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Description" style={styles.input} value={clinicDescription} onChangeText={setClinicDescription} multiline />
+              <TextInput placeholder="Nombre de lits" style={styles.input} value={clinicBeds} onChangeText={setClinicBeds} keyboardType="decimal-pad" />
+              <TextInput placeholder="Nombre de médecins" style={styles.input} value={clinicDoctors} onChangeText={setClinicDoctors} keyboardType="decimal-pad" />
+
+              <ThemedText style={styles.subSectionTitle}>Typologie de lits</ThemedText>
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Nom (ex: lits de soins intensifs)" style={[styles.input, styles.inlineInput]} value={clinicBedInput.name} onChangeText={(text) => setClinicBedInput((previous) => ({ ...previous, name: text }))} />
+                <TextInput placeholder="Nombre" style={[styles.input, styles.inlineInput]} value={clinicBedInput.count} onChangeText={(text) => setClinicBedInput((previous) => ({ ...previous, count: text }))} keyboardType="decimal-pad" />
+              </View>
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateClinicBedType}>
+                <Text style={styles.inlineAddButtonText}>{editingClinicBedIndex === null ? "Ajouter" : "Modifier"}</Text>
+              </TouchableOpacity>
+              {clinicBedTypes.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name}: {item.count}</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setClinicBedInput(item); setEditingClinicBedIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setClinicBedTypes((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <ThemedText style={styles.subSectionTitle}>Typologie de médecins</ThemedText>
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Nom (ex: réanimateurs, anesthésistes, échographes)" style={[styles.input, styles.inlineInput]} value={clinicDoctorInput.name} onChangeText={(text) => setClinicDoctorInput((previous) => ({ ...previous, name: text }))} />
+                <TextInput placeholder="Nombre" style={[styles.input, styles.inlineInput]} value={clinicDoctorInput.count} onChangeText={(text) => setClinicDoctorInput((previous) => ({ ...previous, count: text }))} keyboardType="decimal-pad" />
+              </View>
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateClinicDoctorType}>
+                <Text style={styles.inlineAddButtonText}>{editingClinicDoctorIndex === null ? "Ajouter" : "Modifier"}</Text>
+              </TouchableOpacity>
+              {clinicDoctorTypes.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name}: {item.count}</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setClinicDoctorInput(item); setEditingClinicDoctorIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setClinicDoctorTypes((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <TextInput placeholder="Équipements" style={styles.input} value={clinicEquipments} onChangeText={setClinicEquipments} multiline />
+              <TextInput placeholder="Nombre de blocs opératoires" style={styles.input} value={clinicOperatingBlocks} onChangeText={setClinicOperatingBlocks} keyboardType="decimal-pad" />
+              <TextInput placeholder="Salles complémentaires" style={styles.input} value={clinicComplementaryRooms} onChangeText={setClinicComplementaryRooms} />
+              <TextInput placeholder="Spécialités médicales & chirurgicales (ex: Ophtalmologie, Réanimation & Néonatologie, Cardiologie)" style={styles.input} value={clinicSpecialties} onChangeText={setClinicSpecialties} multiline />
+            </>
+          )}
+
+          {projectType === "Hotel" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Hôtel - Informations générales</ThemedText>
+              <TextInput placeholder="Sous-type" style={styles.input} value={hotelSubtype} onChangeText={setHotelSubtype} />
+              <TextInput placeholder="Catégorie" style={styles.input} value={hotelCategory} onChangeText={setHotelCategory} />
+              <Text style={styles.fieldLabel}>Catégorie (sélection rapide)</Text>
+              <View style={styles.chipsRow}>
+                {hotelCategoryOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.optionChip, hotelCategory === option && styles.optionChipActive]}
+                    onPress={() => setHotelCategory(option)}
+                  >
+                    <Text style={[styles.optionChipText, hotelCategory === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Note Booking" style={styles.input} value={hotelBookingNote} onChangeText={setHotelBookingNote} keyboardType="decimal-pad" />
+              <TextInput placeholder="Opérateur" style={styles.input} value={hotelOperator} onChangeText={setHotelOperator} />
+              <TextInput placeholder="Investisseur / Propriétaire" style={styles.input} value={hotelInvestor} onChangeText={setHotelInvestor} />
+              <TextInput placeholder="Gestionnaire" style={styles.input} value={hotelManager} onChangeText={setHotelManager} />
+              <TextInput placeholder="Date de rénovation" style={styles.input} value={hotelRenovationDate} onChangeText={setHotelRenovationDate} />
+
+              <ThemedText style={styles.sectionTitle}>Hôtel - Hébergement</ThemedText>
+              <TextInput placeholder="Nombre de clés" style={styles.input} value={hotelKeys} onChangeText={setHotelKeys} keyboardType="decimal-pad" />
+              <TextInput placeholder="Nombre d'étages" style={styles.input} value={hotelFloors} onChangeText={setHotelFloors} keyboardType="decimal-pad" />
+
+              <ThemedText style={styles.subSectionTitle}>Typologie des chambres</ThemedText>
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Type" style={[styles.input, styles.inlineInput]} value={hotelRoomInput.type} onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, type: text }))} />
+                <TextInput placeholder="Nombre" style={[styles.input, styles.inlineInput]} value={hotelRoomInput.count} onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, count: text }))} keyboardType="decimal-pad" />
+              </View>
+              <TextInput placeholder="Surface (m²)" style={styles.input} value={hotelRoomInput.surface} onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, surface: text }))} keyboardType="decimal-pad" />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelRoom}>
+                <Text style={styles.inlineAddButtonText}>{editingHotelRoomIndex === null ? "Ajouter chambre" : "Modifier chambre"}</Text>
+              </TouchableOpacity>
+              {hotelRooms.map((item, index) => (
+                <View key={`${item.type}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.type} - {item.count} - {item.surface} m²</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setHotelRoomInput(item); setEditingHotelRoomIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setHotelRooms((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <ThemedText style={styles.subSectionTitle}>Restauration (F&B)</ThemedText>
+              <TextInput placeholder="Nom" style={styles.input} value={hotelFnBInput.name} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, name: text }))} />
+              <TextInput placeholder="Type" style={styles.input} value={hotelFnBInput.type} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, type: text }))} />
+              <TextInput placeholder="Capacité" style={styles.input} value={hotelFnBInput.capacity} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, capacity: text }))} />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelFnB}><Text style={styles.inlineAddButtonText}>{editingHotelFnBIndex === null ? "Ajouter F&B" : "Modifier F&B"}</Text></TouchableOpacity>
+              {hotelFnB.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.capacity}</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setHotelFnBInput(item); setEditingHotelFnBIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setHotelFnB((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <ThemedText style={styles.subSectionTitle}>MICE</ThemedText>
+              <TextInput placeholder="Nom" style={styles.input} value={hotelMiceInput.name} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, name: text }))} />
+              <TextInput placeholder="Type" style={styles.input} value={hotelMiceInput.type} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, type: text }))} />
+              <TextInput placeholder="Nombre de salles" style={styles.input} value={hotelMiceInput.roomsCount || ""} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, roomsCount: text }))} />
+              <TextInput placeholder="Capacité" style={styles.input} value={hotelMiceInput.capacity} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, capacity: text }))} />
+              <TextInput placeholder="Surface" style={styles.input} value={hotelMiceInput.surface || ""} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, surface: text }))} />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelMice}><Text style={styles.inlineAddButtonText}>{editingHotelMiceIndex === null ? "Ajouter MICE" : "Modifier MICE"}</Text></TouchableOpacity>
+              {hotelMice.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.roomsCount} salles - {item.capacity}</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setHotelMiceInput(item); setEditingHotelMiceIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setHotelMice((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+
+              <ThemedText style={styles.subSectionTitle}>Loisirs</ThemedText>
+              <TextInput placeholder="Nom" style={styles.input} value={hotelLeisureInput.name} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, name: text }))} />
+              <TextInput placeholder="Type" style={styles.input} value={hotelLeisureInput.type} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, type: text }))} />
+              <TextInput placeholder="Nombre" style={styles.input} value={hotelLeisureInput.count || ""} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, count: text }))} />
+              <TextInput placeholder="Surface" style={styles.input} value={hotelLeisureInput.surface || ""} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, surface: text }))} />
+              <TextInput placeholder="Capacité" style={styles.input} value={hotelLeisureInput.capacity} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, capacity: text }))} />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelLeisure}><Text style={styles.inlineAddButtonText}>{editingHotelLeisureIndex === null ? "Ajouter loisir" : "Modifier loisir"}</Text></TouchableOpacity>
+              {hotelLeisure.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.count} - {item.surface}</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setHotelLeisureInput(item); setEditingHotelLeisureIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setHotelLeisure((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </>
           )}
 
@@ -2134,7 +3284,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           )}
 
           {/* Densité */}
-          {projectType !== "Retail" && (
+          {(isMixedProject || ["Collectif", "Villa", "Lot de villas"].includes(projectType)) && (
             <>
               <ThemedText style={{ marginTop: 20, fontSize: 16, fontWeight: "bold", color: AppColors.primary.main }}>
                 Densité
@@ -2236,6 +3386,38 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               )}
             </>
           )}
+
+          <ThemedText style={styles.sectionTitle}>Sources</ThemedText>
+          <TextInput
+            placeholder="Lien / source (article, site officiel, etc.)"
+            style={styles.input}
+            value={sourceLink}
+            onChangeText={setSourceLink}
+            autoCapitalize="none"
+          />
+
+          <ThemedText style={styles.sectionTitle}>Photos / Images</ThemedText>
+          <View style={styles.photoActionsRow}>
+            <TouchableOpacity style={styles.inlineAddButton} onPress={pickPhotosFromLibrary}>
+              <Text style={styles.inlineAddButtonText}>Ajouter depuis appareil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.inlineAddButton} onPress={takePhotoWithCamera}>
+              <Text style={styles.inlineAddButtonText}>Prendre une photo</Text>
+            </TouchableOpacity>
+          </View>
+          {photos.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {photos.map((photo, index) => (
+                <View key={`${photo.uri}-${index}`} style={styles.photoPreviewCard}>
+                  <ExpoImage source={{ uri: photo.uri }} style={styles.photoPreview} contentFit="cover" />
+                  <TouchableOpacity style={styles.photoDeleteButton} onPress={() => removePhoto(index)}>
+                    <Text style={styles.photoDeleteButtonText}>Supprimer</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+          {isUploadingPhotos ? <Text style={styles.uploadHint}>Upload photos en cours...</Text> : null}
 
           <ThemedText style={styles.locationTitle}>Localisation</ThemedText>
           <ThemedText style={styles.locationSubtitle}>Situez le projet sur la carte ou recherchez une adresse</ThemedText>
@@ -2378,6 +3560,24 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           <View style={{ height: 20 }} />
         </ScrollView>
       )}
+
+      <AppNoticeModal
+        visible={notice.visible}
+        type={notice.type}
+        title={notice.title}
+        message={notice.message}
+        primaryAction={{
+          label: notice.primaryLabel,
+          variant: notice.primaryVariant,
+          onPress: notice.onPrimary,
+        }}
+        secondaryAction={notice.secondaryLabel ? {
+          label: notice.secondaryLabel,
+          variant: "secondary",
+          onPress: notice.onSecondary,
+        } : undefined}
+        onDismiss={closeNotice}
+      />
     </>
   );
 }
@@ -2415,6 +3615,173 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: AppColors.primary.main,
     fontFamily: "Century Gothic",
+  },
+
+  sectionTitle: {
+    marginTop: 20,
+    marginBottom: 10,
+    fontSize: 18,
+    fontWeight: "700",
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
+  },
+
+  subSectionTitle: {
+    marginTop: 14,
+    marginBottom: 8,
+    fontSize: 15,
+    fontWeight: "700",
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
+  },
+
+  fieldLabel: {
+    marginBottom: 8,
+    fontSize: 13,
+    color: AppColors.gray.dark,
+    fontFamily: "Century Gothic",
+  },
+
+  chipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 10,
+  },
+
+  optionChip: {
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    borderRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: AppColors.ui.background,
+  },
+
+  optionChipActive: {
+    backgroundColor: AppColors.primary.main,
+    borderColor: AppColors.primary.main,
+  },
+
+  optionChipText: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  optionChipTextActive: {
+    color: AppColors.ui.background,
+  },
+
+  inlineRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+
+  inlineInput: {
+    flex: 1,
+  },
+
+  inlineAddButton: {
+    marginBottom: 10,
+    borderRadius: 10,
+    backgroundColor: AppColors.primary.main,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignSelf: "flex-start",
+  },
+
+  inlineAddButtonText: {
+    color: AppColors.ui.background,
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  inlineCard: {
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: AppColors.ui.background,
+    marginBottom: 8,
+  },
+
+  inlineCardSimple: {
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    borderRadius: 10,
+    padding: 10,
+    backgroundColor: AppColors.ui.background,
+    marginBottom: 8,
+  },
+
+  inlineCardTitle: {
+    color: AppColors.primary.main,
+    fontWeight: "700",
+    fontSize: 13,
+    marginBottom: 4,
+  },
+
+  inlineCardText: {
+    color: AppColors.ui.text,
+    fontSize: 12,
+    marginBottom: 2,
+  },
+
+  inlineActionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+
+  inlineActionEdit: {
+    color: AppColors.primary.main,
+    fontWeight: "700",
+  },
+
+  inlineActionDelete: {
+    color: "#C0392B",
+    fontWeight: "700",
+  },
+
+  photoActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 10,
+  },
+
+  photoPreviewCard: {
+    width: 145,
+    marginRight: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    overflow: "hidden",
+    backgroundColor: AppColors.ui.background,
+  },
+
+  photoPreview: {
+    width: "100%",
+    height: 100,
+  },
+
+  photoDeleteButton: {
+    paddingVertical: 8,
+    alignItems: "center",
+    backgroundColor: AppColors.gray.lightest,
+  },
+
+  photoDeleteButtonText: {
+    color: "#C0392B",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  uploadHint: {
+    marginBottom: 10,
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontWeight: "600",
   },
 
   locationTitle: {
@@ -2710,6 +4077,29 @@ const styles = StyleSheet.create({
   calendarTitle: {
     color: AppColors.primary.main,
     fontSize: 16,
+    fontWeight: "700",
+  },
+
+  calendarQuickActionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+    marginBottom: 8,
+  },
+
+  calendarQuickButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    borderRadius: 8,
+    paddingVertical: 6,
+    alignItems: "center",
+    backgroundColor: AppColors.ui.background,
+  },
+
+  calendarQuickButtonText: {
+    color: AppColors.primary.main,
+    fontSize: 12,
     fontWeight: "700",
   },
 

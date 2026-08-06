@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Alert, Image, Platform, StyleSheet, View, Text, TextInput, Modal, Pressable, ScrollView, TouchableOpacity } from "react-native";
+import { Image, Linking, Platform, StyleSheet, View, Text, TextInput, Modal, Pressable, ScrollView, TouchableOpacity } from "react-native";
 import MapView, { Marker } from "@/components/ui/MapViewWrapper";
 import { supabase } from "../../lib/supabase";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { AppColors } from "@/constants/colors";
+import AppNoticeModal, { NoticeType } from "@/components/ui/AppNoticeModal";
 
 type Project = {
   id: string;
@@ -48,6 +49,7 @@ type Project = {
   // Dates
   delivery_date?: string;
   start_commercial_date?: string;
+  source_link?: string;
 };
 
 type Typology = {
@@ -77,17 +79,99 @@ type DensityInfo = {
 };
 
 type RetailInfo = {
+  opening_date?: string;
   gla?: number;
   positionnement?: string;
   mix_retail?: string;
   enseignes?: string;
 };
 
+type ProjectMediaItem = {
+  id: string;
+  media_url: string;
+  media_type?: string;
+  caption?: string;
+};
+
+type ExtendedRetailDetails = {
+  typology?: string;
+  niveaux?: string;
+  parkingPlaces?: string;
+  parkingType?: string;
+  parkingRatio?: string;
+  shoppingCount?: string;
+  shoppingBrands?: string;
+  foodCount?: string;
+  foodBrands?: string;
+  foodTypologies?: string[];
+  servicesCount?: string;
+  servicesBrands?: string;
+  leisureCount?: string;
+  leisureBrands?: string;
+  mainTenants?: string;
+  occupancyRate?: string;
+};
+
+type ExtendedOfficeDetails = {
+  officeType?: string;
+  concept?: string;
+  target?: string;
+  services?: string;
+  openingDate?: string;
+  spaces?: Array<{
+    space?: string;
+    description?: string;
+    pricingMode?: "from" | "between";
+    pricingMin?: string;
+    pricingMax?: string;
+    pricingUnit?: string;
+    pricingComment?: string;
+  }>;
+};
+
+type ExtendedHealthDetails = {
+  clinicTypology?: string;
+  description?: string;
+  beds?: string;
+  bedTypes?: Array<{ name?: string; count?: string }>;
+  doctors?: string;
+  doctorTypes?: Array<{ name?: string; count?: string }>;
+  equipments?: string;
+  operatingBlocks?: string;
+  complementaryRooms?: string;
+  specialties?: string;
+  openingDate?: string;
+};
+
+type ExtendedHotelDetails = {
+  subtype?: string;
+  category?: string;
+  bookingNote?: string;
+  operator?: string;
+  investor?: string;
+  manager?: string;
+  renovationDate?: string;
+  keys?: string;
+  floors?: string;
+  openingDate?: string;
+  rooms?: Array<{ type?: string; count?: string; surface?: string }>;
+  fnb?: Array<{ name?: string; type?: string; capacity?: string }>;
+  mice?: Array<{ name?: string; type?: string; roomsCount?: string; capacity?: string; surface?: string }>;
+  leisure?: Array<{ name?: string; type?: string; count?: string; surface?: string; capacity?: string }>;
+};
+
+type ProjectExtendedDetails = {
+  retail?: ExtendedRetailDetails;
+  office?: ExtendedOfficeDetails;
+  health?: ExtendedHealthDetails;
+  hotel?: ExtendedHotelDetails;
+};
+
 type MapViewProps = {
   mapType?: "standard" | "satellite" | "hybrid" | "terrain";
   markerSize?: number;
   markerColor?: string;
-  projectTypeColors?: Record<"Collectif" | "Villa" | "Lot de villas" | "Retail", string>;
+  projectTypeColors?: Record<"Collectif" | "Villa" | "Lot de villas" | "Retail" | "Bureau" | "Santé" | "Hotel", string>;
   markerBorderColor?: string;
   markerTextSize?: number;
 };
@@ -107,6 +191,18 @@ type SelectionRect = {
 type WebMapExportApi = {
   getContainerElement: () => HTMLElement | null;
   latLngToContainerPoint: (coordinate: { latitude: number; longitude: number }) => SelectionPoint;
+};
+
+type NoticeState = {
+  visible: boolean;
+  type: NoticeType;
+  title: string;
+  message: string;
+  primaryLabel: string;
+  primaryVariant?: "primary" | "secondary" | "danger";
+  secondaryLabel?: string;
+  onPrimary?: () => void;
+  onSecondary?: () => void;
 };
 
 const clampSelectionSize = (value: number) => Math.max(1, value);
@@ -135,7 +231,7 @@ const splitProjectsIntoColumns = <T,>(items: T[]) => {
   return [items.slice(0, midpoint), items.slice(midpoint)];
 };
 
-const FILTER_TYPES = ["Collectif", "Villa", "Lot de villas", "Retail"] as const;
+const FILTER_TYPES = ["Collectif", "Villa", "Lot de villas", "Retail", "Bureau", "Santé", "Hotel"] as const;
 type FilterType = (typeof FILTER_TYPES)[number];
 
 const PROJECT_TYPE_DEFAULT_COLORS: Record<FilterType, string> = {
@@ -143,6 +239,9 @@ const PROJECT_TYPE_DEFAULT_COLORS: Record<FilterType, string> = {
   Villa: "#FF0066",
   "Lot de villas": "#00CCEE",
   Retail: "#00B050",
+  Bureau: "#18424E",
+  "Santé": "#009999",
+  Hotel: "#7030A0",
 };
 
 const getProjectFilterTypes = (projectType: string | undefined): FilterType[] => {
@@ -162,6 +261,15 @@ const getProjectFilterTypes = (projectType: string | undefined): FilterType[] =>
   }
   if (normalized.includes("retail")) {
     types.push("Retail");
+  }
+  if (normalized.includes("bureau")) {
+    types.push("Bureau");
+  }
+  if (normalized.includes("sant")) {
+    types.push("Santé");
+  }
+  if (normalized.includes("hotel") || normalized.includes("hôtel")) {
+    types.push("Hotel");
   }
 
   return types;
@@ -290,8 +398,11 @@ export default function MapScreen({
   const [projectTypologies, setProjectTypologies] = useState<Typology[]>([]);
   const [projectDensity, setProjectDensity] = useState<DensityInfo[]>([]);
   const [projectRetail, setProjectRetail] = useState<RetailInfo | null>(null);
+  const [projectMedia, setProjectMedia] = useState<ProjectMediaItem[]>([]);
+  const [projectExtendedDetails, setProjectExtendedDetails] = useState<ProjectExtendedDetails | null>(null);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterType[]>([...FILTER_TYPES]);
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string | null>(null);
   const [citySearchQuery, setCitySearchQuery] = useState("");
   const [isSearchingCity, setIsSearchingCity] = useState(false);
   const [mapExportApi, setMapExportApi] = useState<WebMapExportApi | null>(null);
@@ -299,6 +410,21 @@ export default function MapScreen({
   const [selectionStart, setSelectionStart] = useState<SelectionPoint | null>(null);
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [notice, setNotice] = useState<NoticeState>({
+    visible: false,
+    type: "info",
+    title: "Information",
+    message: "",
+    primaryLabel: "OK",
+  });
+
+  const showNotice = useCallback((payload: Omit<NoticeState, "visible">) => {
+    setNotice({ visible: true, ...payload });
+  }, []);
+
+  const closeNotice = useCallback(() => {
+    setNotice((previous) => ({ ...previous, visible: false }));
+  }, []);
 
   // Fetch projects depuis Supabase chaque fois que l'écran est focus
   const fetchProjects = async () => {
@@ -351,12 +477,48 @@ export default function MapScreen({
     }
   };
 
+  const fetchProjectMedia = async (projectId: string) => {
+    const { data, error } = await supabase
+      .from("projects_media")
+      .select("id, media_url, media_type, caption")
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      console.log("Error fetching project media:", error);
+      setProjectMedia([]);
+      return;
+    }
+
+    setProjectMedia((data as ProjectMediaItem[]) || []);
+  };
+
+  const fetchProjectExtendedDetails = async (projectId: string) => {
+    const { data, error } = await supabase
+      .from("projects_extended_details")
+      .select("details")
+      .eq("project_id", projectId)
+      .single();
+
+    if (error) {
+      console.log("Error fetching extended details:", error);
+      setProjectExtendedDetails(null);
+      return;
+    }
+
+    setProjectExtendedDetails((data?.details as ProjectExtendedDetails) || null);
+  };
+
   const handleMarkerPress = async (project: Project) => {
     setSelectedProject(project);
+    setProjectMedia([]);
+    setProjectExtendedDetails(null);
     await Promise.all([
       fetchProjectTypologies(project.id),
       fetchProjectDensity(project.id),
       fetchProjectRetail(project.id),
+      fetchProjectMedia(project.id),
+      fetchProjectExtendedDetails(project.id),
     ]);
   };
 
@@ -371,10 +533,25 @@ export default function MapScreen({
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
       const types = getProjectFilterTypes(project.project_type);
-      if (types.length === 0) return activeFilters.length === FILTER_TYPES.length;
-      return types.some((type) => activeFilters.includes(type));
+      const matchesType = types.length === 0
+        ? activeFilters.length === FILTER_TYPES.length
+        : types.some((type) => activeFilters.includes(type));
+
+      if (!matchesType) return false;
+
+      if (!selectedCityFilter) return true;
+      return (project.city || "").trim().toLowerCase() === selectedCityFilter.trim().toLowerCase();
     });
-  }, [activeFilters, projects]);
+  }, [activeFilters, projects, selectedCityFilter]);
+
+  const cityFilterOptions = useMemo(() => {
+    const uniqueCities = new Set<string>();
+    projects.forEach((project) => {
+      const city = (project.city || "").trim();
+      if (city) uniqueCities.add(city);
+    });
+    return Array.from(uniqueCities).sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
+  }, [projects]);
 
   const toggleFilter = (type: FilterType) => {
     setActiveFilters((previous) => {
@@ -390,7 +567,12 @@ export default function MapScreen({
   const searchCityOnMap = async () => {
     const query = citySearchQuery.trim();
     if (!query) {
-      Alert.alert("Recherche", "Entrez une ville à rechercher.");
+      showNotice({
+        type: "info",
+        title: "Recherche",
+        message: "Entrez une ville à rechercher.",
+        primaryLabel: "Compris",
+      });
       return;
     }
 
@@ -405,7 +587,12 @@ export default function MapScreen({
       const latitude = firstResult?.geometry?.coordinates?.[1];
 
       if (typeof latitude !== "number" || typeof longitude !== "number") {
-        Alert.alert("Recherche", "Aucun résultat trouvé pour cette ville.");
+        showNotice({
+          type: "warning",
+          title: "Recherche",
+          message: "Aucun résultat trouvé pour cette ville.",
+          primaryLabel: "OK",
+        });
         return;
       }
 
@@ -421,9 +608,17 @@ export default function MapScreen({
       }
 
       setCitySearchQuery(firstResult?.properties?.city || query);
+      if (firstResult?.properties?.city) {
+        setSelectedCityFilter(firstResult.properties.city);
+      }
     } catch (error) {
       console.error("City search failed", error);
-      Alert.alert("Recherche", "Impossible de rechercher cette ville pour le moment.");
+      showNotice({
+        type: "error",
+        title: "Recherche",
+        message: "Impossible de rechercher cette ville pour le moment.",
+        primaryLabel: "Fermer",
+      });
     } finally {
       setIsSearchingCity(false);
     }
@@ -435,6 +630,8 @@ export default function MapScreen({
         supabase.from("projects_typologies").delete().eq("project_id", projectId),
         supabase.from("projects_density").delete().eq("project_id", projectId),
         supabase.from("projects_retail").delete().eq("project_id", projectId),
+        supabase.from("projects_media").delete().eq("project_id", projectId),
+        supabase.from("projects_extended_details").delete().eq("project_id", projectId),
       ];
 
       const deleteRelations = await Promise.all(deletes);
@@ -452,39 +649,38 @@ export default function MapScreen({
       setProjectTypologies([]);
       setProjectDensity([]);
       setProjectRetail(null);
+      setProjectMedia([]);
+      setProjectExtendedDetails(null);
       await fetchProjects();
     };
 
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      const confirmed = window.confirm("Voulez-vous vraiment supprimer ce projet ?");
-      if (!confirmed) return;
-
-      try {
-        await executeDelete();
-        window.alert("Projet supprimé avec succès.");
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
-        window.alert(`Suppression impossible: ${errorMessage}`);
-      }
-      return;
-    }
-
-    Alert.alert("Supprimer ce projet", "Voulez-vous vraiment supprimer ce projet ?", [
-      { text: "Annuler", style: "cancel" },
-      {
-        text: "Supprimer",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await executeDelete();
-            Alert.alert("Succès", "Projet supprimé avec succès.");
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
-            Alert.alert("Erreur", `Suppression impossible: ${errorMessage}`);
-          }
-        },
+    showNotice({
+      type: "warning",
+      title: "Supprimer ce projet",
+      message: "Voulez-vous vraiment supprimer ce projet ?",
+      primaryLabel: "Supprimer",
+      primaryVariant: "danger",
+      secondaryLabel: "Annuler",
+      onPrimary: async () => {
+        try {
+          await executeDelete();
+          showNotice({
+            type: "success",
+            title: "Succès",
+            message: "Projet supprimé avec succès.",
+            primaryLabel: "Parfait",
+          });
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+          showNotice({
+            type: "error",
+            title: "Erreur",
+            message: `Suppression impossible: ${errorMessage}`,
+            primaryLabel: "Fermer",
+          });
+        }
       },
-    ]);
+    });
   };
 
   const getDensityLabel = (projectType: string | undefined, densityType: string) => {
@@ -609,6 +805,25 @@ export default function MapScreen({
     return `Entre ${formatNumericPrice(minPrice, unit)} et ${formatNumericPrice(maxPrice, unit)}`;
   };
 
+  const formatOfficeSpacePricing = (space: NonNullable<ExtendedOfficeDetails["spaces"]>[number]) => {
+    if (!space) return "";
+    if (space.pricingMode === "between" && space.pricingMin && space.pricingMax) {
+      return `Entre ${space.pricingMin} et ${space.pricingMax} ${space.pricingUnit || "MAD"}`;
+    }
+    if (space.pricingMin) {
+      return `A partir de ${space.pricingMin} ${space.pricingUnit || "MAD"}`;
+    }
+    return "";
+  };
+
+  const formatCountTypePairs = (items?: Array<{ name?: string; count?: string }>) => {
+    if (!items || items.length === 0) return "";
+    return items
+      .filter((item) => item?.name || item?.count)
+      .map((item) => `${item.name || "Type"}: ${item.count || "-"}`)
+      .join(" • ");
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchProjects();
@@ -623,6 +838,51 @@ export default function MapScreen({
     return "Zone prête. Exportez le PPT.";
   }, [selectionRect]);
 
+  const selectedTypeFilters = useMemo(() => getProjectFilterTypes(selectedProject?.project_type), [selectedProject?.project_type]);
+  const isRetailSelected = selectedTypeFilters.includes("Retail");
+  const isOfficeSelected = selectedTypeFilters.includes("Bureau");
+  const isHealthSelected = selectedTypeFilters.includes("Santé");
+  const isHotelSelected = selectedTypeFilters.includes("Hotel");
+
+  const normalizeUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const openSourceLink = async (rawUrl: string) => {
+    const targetUrl = normalizeUrl(rawUrl);
+    if (!targetUrl) return;
+
+    try {
+      const canOpen = await Linking.canOpenURL(targetUrl);
+      if (!canOpen) {
+        showNotice({
+          type: "warning",
+          title: "Source",
+          message: "Lien invalide ou non supporté.",
+          primaryLabel: "OK",
+        });
+        return;
+      }
+      await Linking.openURL(targetUrl);
+    } catch {
+      showNotice({
+        type: "error",
+        title: "Source",
+        message: "Impossible d'ouvrir ce lien pour le moment.",
+        primaryLabel: "Fermer",
+      });
+    }
+  };
+
+  const closeDetailsModal = useCallback(() => {
+    setSelectedProject(null);
+    setProjectMedia([]);
+    setProjectExtendedDetails(null);
+  }, []);
+
   const resetSelectionMode = useCallback(() => {
     setIsSelectionMode(false);
     setSelectionStart(null);
@@ -631,7 +891,12 @@ export default function MapScreen({
 
   const beginSelectionMode = useCallback(() => {
     if (Platform.OS !== "web") {
-      Alert.alert("Export PPT", "L'export PPT est disponible sur la version web pour le moment.");
+      showNotice({
+        type: "info",
+        title: "Export PPT",
+        message: "L'export PPT est disponible sur la version web pour le moment.",
+        primaryLabel: "OK",
+      });
       return;
     }
 
@@ -678,18 +943,33 @@ export default function MapScreen({
 
   const exportMappingToPpt = useCallback(async () => {
     if (Platform.OS !== "web") {
-      Alert.alert("Export PPT", "Cette fonctionnalité est disponible sur le web pour le moment.");
+      showNotice({
+        type: "info",
+        title: "Export PPT",
+        message: "Cette fonctionnalité est disponible sur le web pour le moment.",
+        primaryLabel: "OK",
+      });
       return;
     }
 
     if (!mapExportApi || !selectionRect) {
-      Alert.alert("Export PPT", "Délimitez d'abord une zone sur la carte.");
+      showNotice({
+        type: "warning",
+        title: "Export PPT",
+        message: "Délimitez d'abord une zone sur la carte.",
+        primaryLabel: "Compris",
+      });
       return;
     }
 
     const mapElement = mapExportApi.getContainerElement();
     if (!mapElement) {
-      Alert.alert("Export PPT", "Carte non disponible pour l'export.");
+      showNotice({
+        type: "error",
+        title: "Export PPT",
+        message: "Carte non disponible pour l'export.",
+        primaryLabel: "Fermer",
+      });
       return;
     }
 
@@ -756,7 +1036,12 @@ export default function MapScreen({
         ));
 
       if (selectedProjects.length === 0) {
-        Alert.alert("Export PPT", "Aucun projet n'est présent dans la zone sélectionnée.");
+        showNotice({
+          type: "warning",
+          title: "Export PPT",
+          message: "Aucun projet n'est présent dans la zone sélectionnée.",
+          primaryLabel: "OK",
+        });
         return;
       }
 
@@ -912,15 +1197,20 @@ export default function MapScreen({
     } catch (error) {
       console.error("PPT export failed", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
-      Alert.alert("Export PPT", `Impossible de générer le fichier PPT: ${errorMessage}`);
+      showNotice({
+        type: "error",
+        title: "Export PPT",
+        message: `Impossible de générer le fichier PPT: ${errorMessage}`,
+        primaryLabel: "Fermer",
+      });
     } finally {
       setIsExporting(false);
     }
-  }, [filteredProjects, mapExportApi, markerBorderColor, markerColor, markerSize, markerTextSize, resetSelectionMode, selectionRect]);
+  }, [filteredProjects, mapExportApi, markerBorderColor, markerColor, markerSize, markerTextSize, resetSelectionMode, selectionRect, showNotice]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.topLeftControls}>
+      <View style={[styles.topLeftControls, Platform.OS !== "web" && styles.topLeftControlsMobile]}>
         <View style={styles.citySearchRow}>
           <TextInput
             style={styles.citySearchInput}
@@ -935,6 +1225,28 @@ export default function MapScreen({
             <Text style={styles.citySearchButtonText}>{isSearchingCity ? "..." : "Go"}</Text>
           </TouchableOpacity>
         </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.cityFiltersRow}>
+          <TouchableOpacity
+            style={[styles.cityFilterChip, !selectedCityFilter && styles.cityFilterChipActive]}
+            onPress={() => setSelectedCityFilter(null)}
+          >
+            <Text style={[styles.cityFilterChipText, !selectedCityFilter && styles.cityFilterChipTextActive]}>
+              Toutes les villes
+            </Text>
+          </TouchableOpacity>
+          {cityFilterOptions.map((cityOption) => (
+            <TouchableOpacity
+              key={cityOption}
+              style={[styles.cityFilterChip, selectedCityFilter === cityOption && styles.cityFilterChipActive]}
+              onPress={() => setSelectedCityFilter(cityOption)}
+            >
+              <Text style={[styles.cityFilterChipText, selectedCityFilter === cityOption && styles.cityFilterChipTextActive]}>
+                {cityOption}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         <ScrollView
           horizontal
@@ -989,6 +1301,8 @@ export default function MapScreen({
         }}
       >
         {filteredProjects.map((project, index) => {
+          const displayIndex = index + 1;
+          const markerRenderKey = `${project.id}-${displayIndex}`;
           // Afficher les numéros SEULEMENT en mode satellite/hybrid
           const isSatelliteMode = mapType === "satellite" || mapType === "hybrid";
           const primaryType = getPrimaryFilterType(project.project_type);
@@ -997,7 +1311,7 @@ export default function MapScreen({
           if (Platform.OS !== "web") {
             return (
               <Marker
-                key={project.id}
+                key={markerRenderKey}
                 coordinate={{
                   latitude: project.latitude,
                   longitude: project.longitude,
@@ -1020,7 +1334,7 @@ export default function MapScreen({
                       },
                     ]}
                   >
-                    <Text style={[styles.markerNumber, { fontSize: markerTextSize }]}>{index + 1}</Text>
+                    <Text style={[styles.markerNumber, { fontSize: markerTextSize }]}>{displayIndex}</Text>
                   </View>
                 ) : (
                   <Text style={styles.defaultMarkerIcon}>📍</Text>
@@ -1030,12 +1344,12 @@ export default function MapScreen({
           }
 
           const iconHtml = isSatelliteMode
-            ? `<div style="display:flex;align-items:center;justify-content:center;width:${markerSize}px;height:${markerSize}px;border-radius:${markerSize / 2}px;background:${projectMarkerColor};border:2px solid ${markerBorderColor};color:white;font-size:${markerTextSize}px;font-weight:700;">${index + 1}</div>`
+            ? `<div style="display:flex;align-items:center;justify-content:center;width:${markerSize}px;height:${markerSize}px;border-radius:${markerSize / 2}px;background:${projectMarkerColor};border:2px solid ${markerBorderColor};color:white;font-size:${markerTextSize}px;font-weight:700;">${displayIndex}</div>`
             : `<div style="font-size:24px;">📍</div>`;
 
           return (
             <Marker
-              key={project.id}
+              key={markerRenderKey}
               coordinate={{
                 latitude: project.latitude,
                 longitude: project.longitude,
@@ -1142,19 +1456,39 @@ export default function MapScreen({
           <View style={styles.detailsModalContent}>
             <Pressable 
               style={styles.detailsCloseArea}
-              onPress={() => setSelectedProject(null)}
+              onPress={closeDetailsModal}
             />
-            
-            <ScrollView style={styles.detailsScrollView} scrollEnabled={true}>
-              <View style={styles.detailsHeader}>
-                <Text style={styles.detailsTitle}>{selectedProject?.name}</Text>
-                <Pressable onPress={() => setSelectedProject(null)}>
-                  <Text style={styles.detailsCloseButton}>✕</Text>
-                </Pressable>
-              </View>
 
+            <View style={styles.detailsHeader}>
+              <Text style={styles.detailsTitle}>{selectedProject?.name}</Text>
+              <Pressable onPress={closeDetailsModal}>
+                <Text style={styles.detailsCloseButton}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.headerMetaRow}>
+              {selectedProject?.project_type ? <Text style={styles.headerMetaPill}>{selectedProject.project_type}</Text> : null}
+              {selectedProject?.status ? <Text style={styles.headerMetaPill}>{selectedProject.status}</Text> : null}
+              {selectedProject?.city ? <Text style={styles.headerMetaPill}>{selectedProject.city}</Text> : null}
+            </View>
+
+            <ScrollView style={styles.detailsScrollView} scrollEnabled={true}>
               {selectedProject && (
                 <>
+                  {projectMedia.length > 0 && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Images</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaRow}>
+                        {projectMedia.map((media) => (
+                          <View key={media.id} style={styles.mediaCard}>
+                            <Image source={{ uri: media.media_url }} style={styles.mediaImage} resizeMode="cover" />
+                            {media.caption ? <Text style={styles.mediaCaption}>{media.caption}</Text> : null}
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+
                   {/* === INFORMATIONS GÉNÉRALES === */}
                   
                   {/* Développeur */}
@@ -1198,6 +1532,20 @@ export default function MapScreen({
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Business model</Text>
                       <Text style={styles.detailsValue}>{selectedProject.business_model}</Text>
+                    </View>
+                  )}
+
+                  {selectedProject.source_link && (
+                    <View style={styles.detailsSection}>
+                      <Text style={styles.detailsLabel}>Source</Text>
+                      <TouchableOpacity
+                        onPress={() => openSourceLink(selectedProject.source_link || "")}
+                        activeOpacity={0.8}
+                        style={styles.sourceLinkButton}
+                      >
+                        <Text style={styles.sourceLinkText}>{selectedProject.source_link}</Text>
+                        <Text style={styles.sourceLinkHint}>Ouvrir la source</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
 
@@ -1439,37 +1787,351 @@ export default function MapScreen({
 
                   {/* === RETAIL === */}
 
-                  {projectRetail && (
+                  {isRetailSelected && (projectRetail || projectExtendedDetails?.retail) && (
                     <>
-                      <View style={styles.sectionDivider}>
-                        <Text style={styles.sectionDividerText}>INFORMATIONS RETAIL</Text>
-                      </View>
-
-                      {projectRetail.gla && (
+                      {projectRetail?.opening_date && (
                         <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>GLA (Gross Leasable Area)</Text>
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectRetail.opening_date}</Text>
+                        </View>
+                      )}
+
+                      {projectRetail?.gla != null && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>GLA</Text>
                           <Text style={styles.detailsValue}>{projectRetail.gla.toLocaleString()} m²</Text>
                         </View>
                       )}
 
-                      {projectRetail.positionnement && (
+                      {projectExtendedDetails?.retail?.typology && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Typologie retail</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.retail.typology}</Text>
+                        </View>
+                      )}
+
+                      {projectRetail?.positionnement && (
                         <View style={styles.detailsSection}>
                           <Text style={styles.detailsLabel}>Positionnement</Text>
                           <Text style={styles.detailsValue}>{projectRetail.positionnement}</Text>
                         </View>
                       )}
 
-                      {projectRetail.mix_retail && (
+                      {projectRetail?.mix_retail && (
                         <View style={styles.detailsSection}>
                           <Text style={styles.detailsLabel}>Mix retail</Text>
                           <Text style={styles.detailsValue}>{projectRetail.mix_retail}</Text>
                         </View>
                       )}
 
-                      {projectRetail.enseignes && (
+                      {(projectExtendedDetails?.retail?.shoppingCount || projectExtendedDetails?.retail?.shoppingBrands) && (
                         <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Enseignes</Text>
-                          <Text style={styles.detailsValue}>{projectRetail.enseignes}</Text>
+                          <Text style={styles.detailsLabel}>Shopping</Text>
+                          {projectExtendedDetails?.retail?.shoppingCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.shoppingCount}</Text> : null}
+                          {projectExtendedDetails?.retail?.shoppingBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.shoppingBrands}</Text> : null}
+                        </View>
+                      )}
+
+                      {(projectExtendedDetails?.retail?.foodCount || projectExtendedDetails?.retail?.foodTypologies?.length || projectExtendedDetails?.retail?.foodBrands) && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Food & Beverage</Text>
+                          {projectExtendedDetails?.retail?.foodCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.foodCount}</Text> : null}
+                          {projectExtendedDetails?.retail?.foodTypologies?.length ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.foodTypologies.join(" • ")}</Text> : null}
+                          {projectExtendedDetails?.retail?.foodBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.foodBrands}</Text> : null}
+                        </View>
+                      )}
+
+                      {(projectExtendedDetails?.retail?.servicesCount || projectExtendedDetails?.retail?.servicesBrands) && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Services</Text>
+                          {projectExtendedDetails?.retail?.servicesCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.servicesCount}</Text> : null}
+                          {projectExtendedDetails?.retail?.servicesBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.servicesBrands}</Text> : null}
+                        </View>
+                      )}
+
+                      {(projectExtendedDetails?.retail?.leisureCount || projectExtendedDetails?.retail?.leisureBrands) && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Loisirs</Text>
+                          {projectExtendedDetails?.retail?.leisureCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.leisureCount}</Text> : null}
+                          {projectExtendedDetails?.retail?.leisureBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.leisureBrands}</Text> : null}
+                        </View>
+                      )}
+
+                      {(projectExtendedDetails?.retail?.niveaux || projectExtendedDetails?.retail?.parkingPlaces || projectExtendedDetails?.retail?.parkingType || projectExtendedDetails?.retail?.parkingRatio) && (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails?.retail?.niveaux ? <Text style={styles.detailsValue}>Niveaux: {projectExtendedDetails.retail.niveaux}</Text> : null}
+                          {projectExtendedDetails?.retail?.parkingPlaces ? <Text style={styles.detailsValue}>Places parking: {projectExtendedDetails.retail.parkingPlaces}</Text> : null}
+                          {projectExtendedDetails?.retail?.parkingType ? <Text style={styles.detailsValue}>Type parking: {projectExtendedDetails.retail.parkingType}</Text> : null}
+                          {projectExtendedDetails?.retail?.parkingRatio ? <Text style={styles.detailsValue}>Ratio parking: {projectExtendedDetails.retail.parkingRatio}</Text> : null}
+                        </View>
+                      )}
+
+                      {(projectExtendedDetails?.retail?.mainTenants || projectRetail?.enseignes || projectExtendedDetails?.retail?.occupancyRate) && (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails?.retail?.mainTenants ? <Text style={styles.detailsValue}>Locataires principaux: {projectExtendedDetails.retail.mainTenants}</Text> : null}
+                          {projectRetail?.enseignes ? <Text style={styles.detailsValue}>Enseignes clés: {projectRetail.enseignes}</Text> : null}
+                          {projectExtendedDetails?.retail?.occupancyRate ? <Text style={styles.detailsValue}>Taux d'occupation: {projectExtendedDetails.retail.occupancyRate}%</Text> : null}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {/* === BUREAU === */}
+                  {isOfficeSelected && projectExtendedDetails?.office && (
+                    <>
+                      {projectExtendedDetails.office.openingDate ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.openingDate}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.office.officeType ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Type de bureau</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.officeType}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.office.concept ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Concept</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.concept}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.office.target ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Cible</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.target}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.office.services ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Services</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.services}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.office.spaces && projectExtendedDetails.office.spaces.length > 0 && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Espaces de travail</Text>
+                          {projectExtendedDetails.office.spaces.map((space, index) => (
+                            <View key={`${space.space || "espace"}-${index}`} style={styles.typologyDetailItem}>
+                              <Text style={styles.typologyName}>{space.space || `Espace ${index + 1}`}</Text>
+                              {space.description ? <Text style={styles.typologyDetailText}>{space.description}</Text> : null}
+                              <Text style={styles.typologyDetailText}>{formatOfficeSpacePricing(space)}</Text>
+                              {space.pricingComment ? <Text style={styles.typologyDetailText}>{space.pricingComment}</Text> : null}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  )}
+
+                  {/* === SANTE === */}
+                  {isHealthSelected && projectExtendedDetails?.health && (
+                    <>
+                      {projectExtendedDetails.health.openingDate ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.openingDate}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.clinicTypology ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Typologie</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.clinicTypology}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.description ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Description</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.description}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.specialties ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Spécialités</Text>
+                          {projectExtendedDetails.health.specialties
+                            .split(/\n+/)
+                            .map((item) => item.trim())
+                            .filter(Boolean)
+                            .map((item, index) => (
+                              <Text key={`${item}-${index}`} style={styles.detailsValue}>• {item}</Text>
+                            ))}
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.beds ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Nombre de lits</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.beds}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.doctors ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Nombre de médecins</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.doctors}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.operatingBlocks ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Blocs opératoires</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.operatingBlocks}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.bedTypes?.length ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Typologies de lits</Text>
+                          <Text style={styles.detailsValue}>{formatCountTypePairs(projectExtendedDetails.health.bedTypes)}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.doctorTypes?.length ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Typologies de médecins</Text>
+                          <Text style={styles.detailsValue}>{formatCountTypePairs(projectExtendedDetails.health.doctorTypes)}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.equipments ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Équipements</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.equipments}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.health.complementaryRooms ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Salles complémentaires</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.complementaryRooms}</Text>
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* === HOTEL === */}
+                  {isHotelSelected && projectExtendedDetails?.hotel && (
+                    <>
+                      {projectExtendedDetails.hotel.openingDate ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.openingDate}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.subtype ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Sous-type</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.subtype}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.category ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Catégorie</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.category}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.bookingNote ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Note Booking</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.bookingNote}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.operator ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Opérateur</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.operator}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.investor ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Investisseur</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.investor}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.manager ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Gestionnaire</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.manager}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.renovationDate ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Date de rénovation</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.renovationDate}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.keys ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Clés</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.keys}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.floors ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Étages</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.floors}</Text>
+                        </View>
+                      ) : null}
+
+                      {projectExtendedDetails.hotel.rooms && projectExtendedDetails.hotel.rooms.length > 0 && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Chambres</Text>
+                          {projectExtendedDetails.hotel.rooms.map((room, index) => (
+                            <Text key={`${room.type || "room"}-${index}`} style={styles.detailsValue}>
+                              • {room.type || `Type ${index + 1}`}{room.count ? ` - ${room.count}` : ""}{room.surface ? ` - ${room.surface} m²` : ""}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      {projectExtendedDetails.hotel.fnb && projectExtendedDetails.hotel.fnb.length > 0 && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>F&B</Text>
+                          {projectExtendedDetails.hotel.fnb.map((item, index) => (
+                            <Text key={`${item.name || "fnb"}-${index}`} style={styles.detailsValue}>
+                              • {item.name || `Item ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.capacity ? ` - ${item.capacity}` : ""}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      {projectExtendedDetails.hotel.mice && projectExtendedDetails.hotel.mice.length > 0 && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>MICE</Text>
+                          {projectExtendedDetails.hotel.mice.map((item, index) => (
+                            <Text key={`${item.name || "mice"}-${index}`} style={styles.detailsValue}>
+                              • {item.name || `Espace ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.roomsCount ? ` - ${item.roomsCount} salles` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+
+                      {projectExtendedDetails.hotel.leisure && projectExtendedDetails.hotel.leisure.length > 0 && (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Loisirs</Text>
+                          {projectExtendedDetails.hotel.leisure.map((item, index) => (
+                            <Text key={`${item.name || "loisir"}-${index}`} style={styles.detailsValue}>
+                              • {item.name || `Loisir ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.count ? ` - ${item.count}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}{item.capacity ? ` - ${item.capacity}` : ""}
+                            </Text>
+                          ))}
                         </View>
                       )}
                     </>
@@ -1480,7 +2142,7 @@ export default function MapScreen({
               <TouchableOpacity
                 style={styles.editButton}
                 onPress={() => {
-                  setSelectedProject(null);
+                  closeDetailsModal();
                   router.push(`/(tabs)/AddProject?projectId=${selectedProject?.id}`);
                 }}
               >
@@ -1502,6 +2164,24 @@ export default function MapScreen({
           </View>
         </View>
       </Modal>
+
+      <AppNoticeModal
+        visible={notice.visible}
+        type={notice.type}
+        title={notice.title}
+        message={notice.message}
+        primaryAction={{
+          label: notice.primaryLabel,
+          variant: notice.primaryVariant,
+          onPress: notice.onPrimary,
+        }}
+        secondaryAction={notice.secondaryLabel ? {
+          label: notice.secondaryLabel,
+          variant: "secondary",
+          onPress: notice.onSecondary,
+        } : undefined}
+        onDismiss={closeNotice}
+      />
     </View>
   );
 }
@@ -1517,6 +2197,10 @@ const styles = StyleSheet.create({
     right: 92,
     zIndex: 16,
     gap: 8,
+  },
+
+  topLeftControlsMobile: {
+    top: 56,
   },
 
   citySearchRow: {
@@ -1562,6 +2246,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     paddingRight: 6,
+  },
+
+  cityFiltersRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 8,
+  },
+
+  cityFilterChip: {
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+
+  cityFilterChipActive: {
+    borderColor: AppColors.primary.main,
+    backgroundColor: AppColors.primary.light,
+  },
+
+  cityFilterChipText: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  cityFilterChipTextActive: {
+    color: AppColors.ui.background,
   },
 
   filterChip: {
@@ -1798,22 +2512,43 @@ const styles = StyleSheet.create({
     maxHeight: "85%",
     borderTopWidth: 3,
     borderTopColor: AppColors.primary.light,
+    paddingBottom: 0,
   },
 
   detailsScrollView: {
     paddingTop: 0,
-    paddingBottom: 20,
+    paddingBottom: 18,
   },
 
   detailsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 20,
-    marginBottom: 24,
+    marginTop: 14,
+    marginBottom: 10,
     paddingBottom: 16,
     borderBottomWidth: 2,
     borderBottomColor: AppColors.gray.lightest,
+  },
+
+  headerMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+
+  headerMetaPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: AppColors.primary.light,
+    color: AppColors.primary.main,
+    backgroundColor: AppColors.gray.lightest,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
   },
 
   detailsTitle: {
@@ -1865,9 +2600,38 @@ const styles = StyleSheet.create({
 
   detailsSection: {
     marginBottom: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: AppColors.gray.lightest,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+    backgroundColor: AppColors.ui.background,
+  },
+
+  mediaRow: {
+    gap: 10,
+    paddingRight: 6,
+  },
+
+  mediaCard: {
+    width: 220,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: AppColors.gray.lightest,
+    borderWidth: 1,
+    borderColor: AppColors.gray.lighter,
+  },
+
+  mediaImage: {
+    width: "100%",
+    height: 150,
+  },
+
+  mediaCaption: {
+    fontSize: 12,
+    color: AppColors.gray.dark,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontFamily: "Century Gothic",
   },
 
   detailsLabel: {
@@ -1879,10 +2643,33 @@ const styles = StyleSheet.create({
   },
 
   detailsValue: {
-    fontSize: 16,
+    fontSize: 15,
     color: AppColors.ui.text,
     fontFamily: "Century Gothic",
-    lineHeight: 24,
+    lineHeight: 22,
+  },
+
+  sourceLinkButton: {
+    borderWidth: 1,
+    borderColor: AppColors.primary.light,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: AppColors.gray.lightest,
+  },
+
+  sourceLinkText: {
+    color: AppColors.primary.main,
+    fontSize: 14,
+    textDecorationLine: "underline",
+    fontFamily: "Century Gothic",
+  },
+
+  sourceLinkHint: {
+    marginTop: 6,
+    color: AppColors.gray.dark,
+    fontSize: 12,
+    fontFamily: "Century Gothic",
   },
 
   typologyItem: {
@@ -1959,20 +2746,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  sectionDivider: {
-    backgroundColor: AppColors.primary.main,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    marginVertical: 20,
-    alignItems: "center",
-  },
-
-  sectionDividerText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: AppColors.ui.background,
-    fontFamily: "Century Gothic",
-    letterSpacing: 0.5,
-  },
 });

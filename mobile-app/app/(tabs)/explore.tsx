@@ -5,13 +5,16 @@ import MapScreen from "@/components/ui/MapView";
 import { useRouter } from "expo-router";
 import { AppColors } from "@/constants/colors";
 
-type ProjectTypeColorKey = "Collectif" | "Villa" | "Lot de villas" | "Retail";
+type ProjectTypeColorKey = "Collectif" | "Villa" | "Lot de villas" | "Retail" | "Bureau" | "Santé" | "Hotel";
 
 const PROJECT_TYPE_COLOR_LABELS: Record<ProjectTypeColorKey, string> = {
   Collectif: "Collectif",
   Villa: "Villa",
   "Lot de villas": "Lot de villas",
   Retail: "Retail",
+  Bureau: "Bureau",
+  "Santé": "Santé",
+  Hotel: "Hotel",
 };
 
 export default function TabTwoScreen() {
@@ -27,6 +30,9 @@ export default function TabTwoScreen() {
     Villa: "#FF0066",
     "Lot de villas": "#00CCEE",
     Retail: "#00B050",
+    Bureau: "#18424E",
+    "Santé": "#009999",
+    Hotel: "#7030A0",
   });
   const [activeColorType, setActiveColorType] = useState<ProjectTypeColorKey>("Collectif");
   const [markerBorderColor, setMarkerBorderColor] = useState("#7F7F7F");
