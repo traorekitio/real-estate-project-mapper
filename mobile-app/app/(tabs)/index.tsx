@@ -1,20 +1,37 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from "react";
 import {
-  View,
+  Dimensions,
+  Image,
+  ImageBackground,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   Text,
-  Dimensions,
-  ImageBackground,
-  Alert,
-} from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { AppColors } from '@/constants/colors';
-import { supabase } from '@/lib/supabase';
-import { LogoHeader } from '@/components/LogoHeader';
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
 
-const { width, height } = Dimensions.get('window');
+import { AppColors } from "@/constants/colors";
+import { supabase } from "@/lib/supabase";
+
+const HERO_CITY_IMAGE = require("../../assets/images/home/hero-city.jpeg");
+const HERO_MAP_IMAGE = require("../../assets/images/home/hero-map.png");
+
+const QUICK_MAP_IMAGE = {
+  uri: "https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=900&q=80",
+};
+
+const QUICK_PROJECT_IMAGE = {
+  uri: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=900&q=80",
+};
+
+const QUICK_DASHBOARD_IMAGE = {
+  uri: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=900&q=80",
+};
+
+const PPT_PREVIEW_IMAGE = {
+  uri: "https://images.unsplash.com/photo-1552581234-26160f608093?auto=format&fit=crop&w=1000&q=80",
+};
 
 type Stats = {
   totalProjects: number;
@@ -23,6 +40,8 @@ type Stats = {
   lotProjects: number;
   retailProjects: number;
 };
+
+const SIDEBAR_WIDTH = 88;
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,33 +52,19 @@ export default function HomeScreen() {
     lotProjects: 0,
     retailProjects: 0,
   });
-  const [loading, setLoading] = useState(true);
 
   const fetchStats = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase.from('projects').select('project_type');
-      
-      if (error) {
-        console.log('Error fetching stats:', error);
-        return;
-      }
+    const { data, error } = await supabase.from("projects").select("project_type");
 
-      if (data) {
-        const stats: Stats = {
-          totalProjects: data.length,
-          collectifProjects: data.filter((p: any) => p.project_type?.includes('Collectif')).length,
-          villaProjects: data.filter((p: any) => p.project_type?.includes('Villa')).length,
-          lotProjects: data.filter((p: any) => p.project_type?.includes('Lot')).length,
-          retailProjects: data.filter((p: any) => p.project_type?.includes('Retail')).length,
-        };
-        setStats(stats);
-      }
-    } catch (err) {
-      console.log('Error:', err);
-    } finally {
-      setLoading(false);
-    }
+    if (error || !data) return;
+
+    setStats({
+      totalProjects: data.length,
+      collectifProjects: data.filter((p: any) => p.project_type?.includes("Collectif")).length,
+      villaProjects: data.filter((p: any) => p.project_type?.includes("Villa")).length,
+      lotProjects: data.filter((p: any) => p.project_type?.includes("Lot")).length,
+      retailProjects: data.filter((p: any) => p.project_type?.includes("Retail")).length,
+    });
   };
 
   useFocusEffect(
@@ -68,478 +73,787 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const navigateTo = (route: string) => {
-    router.push(route as any);
-  };
+  const progress = useMemo(() => {
+    const maxTarget = 20;
+    return Math.min((stats.totalProjects / maxTarget) * 100, 100);
+  }, [stats.totalProjects]);
+
+  const isCompact = Dimensions.get("window").width < 940;
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* === HEADER HÉROÏQUE === */}
-      <View style={styles.heroHeader}>
-        <View style={styles.heroOverlay}>
-          <LogoHeader size="large" showText={true} centered={true} />
-          <Text style={styles.heroTitle}>Real Estate Mapper</Text>
-          <Text style={styles.heroSubtitle}>Cartographie Immobilière Intelligente</Text>
-          <Text style={styles.heroDescription}>
-            Explorez, analysez et gérez vos projets immobiliers en un coup d'œil
-          </Text>
-        </View>
-      </View>
+    <View style={styles.screen}>
+      {!isCompact && (
+        <View style={styles.sidebar}>
+          <View style={styles.logoWrap}>
+            <Image source={require("@/assets/logos/logo.png")} style={styles.logoImage} />
+            <Text style={styles.logoText}>Real Estate Mapper</Text>
+          </View>
 
-      {/* === SECTION ACTIONS PRINCIPALES === */}
-      <View style={styles.actionsSection}>
-        <TouchableOpacity
-          style={[styles.actionCard, styles.actionCardPrimary]}
-          onPress={() => navigateTo('/(tabs)/explore')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionCardIcon}>🗺️</Text>
-          <Text style={styles.actionCardTitle}>Explorer la Carte</Text>
-          <Text style={styles.actionCardDesc}>Visualisez tous les projets</Text>
-        </TouchableOpacity>
+          <View style={styles.sidebarNav}>
+            <SidebarItem label="Accueil" icon="⌂" active />
+            <SidebarItem label="Explorer la Carte" icon="◧" onPress={() => router.push("/(tabs)/explore")} />
+            <SidebarItem label="Ajouter Projet" icon="+" onPress={() => router.push("/(tabs)/AddProject")} />
+            <SidebarItem label="Dashboards" icon="▥" onPress={() => router.push("/(tabs)/dashboard")} />
+          </View>
 
-        <TouchableOpacity
-          style={[styles.actionCard, styles.actionCardSecondary]}
-          onPress={() => navigateTo('/(tabs)/AddProject')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionCardIcon}>➕</Text>
-          <Text style={styles.actionCardTitle}>Ajouter Projet</Text>
-          <Text style={styles.actionCardDesc}>Créez un nouveau projet</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionCard, styles.actionCardPrimary]}
-          onPress={() => navigateTo('/(tabs)/dashboard')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.actionCardIcon}>📊</Text>
-          <Text style={styles.actionCardTitle}>Dashboards</Text>
-          <Text style={styles.actionCardDesc}>KPI, pricing, surfaces, geo</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* === STATISTIQUES === */}
-      <View style={styles.statsSection}>
-        <Text style={styles.sectionTitle}>📊 Vue d'ensemble</Text>
-
-        {/* Stat principale */}
-        <View style={styles.mainStat}>
-          <Text style={styles.mainStatNumber}>{stats.totalProjects}</Text>
-          <Text style={styles.mainStatLabel}>Projets Total</Text>
-          <View style={styles.statBarContainer}>
-            <View
-              style={[
-                styles.statBar,
-                { width: `${Math.min((stats.totalProjects / 20) * 100, 100)}%` },
-              ]}
-            />
+          <View style={styles.sidebarFooter}>
+            <Text style={styles.sidebarFooterText}>Mon compte</Text>
+            <View style={styles.modePill}>
+              <View style={styles.modeDotOff} />
+              <View style={styles.modeDotOn} />
+            </View>
           </View>
         </View>
+      )}
 
-        {/* Stats par type */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statCardIcon}>🏢</Text>
-            <Text style={styles.statCardNumber}>{stats.collectifProjects}</Text>
-            <Text style={styles.statCardLabel}>Collectif</Text>
+      <ScrollView
+        style={styles.main}
+        contentContainerStyle={styles.mainContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <ImageBackground source={HERO_CITY_IMAGE} style={[styles.hero, isCompact && styles.heroCompact]} imageStyle={styles.heroImage}>
+          <View style={styles.heroOverlay}>
+            <View style={styles.heroSoftLight} />
+            <View style={[styles.heroLeft, isCompact && styles.heroLeftCompact]}>
+              <Text style={[styles.heroTitle, isCompact && styles.heroTitleCompact]}>Pilotez vos projets immobiliers{"\n"}avec intelligence.</Text>
+              <Text style={[styles.heroSubtitle, isCompact && styles.heroSubtitleCompact]}>
+                Cartographiez, analysez et prenez les meilleures decisions a partir d'une plateforme unique et intuitive.
+              </Text>
+              <View style={styles.badgesRow}>
+                <Badge text="Donnees fiables" />
+                <Badge text="Vue terrain instantanee" />
+                <Badge text="Decisions eclairees" />
+              </View>
+            </View>
+
+            <View style={[styles.heroRightClip, isCompact && styles.heroRightClipCompact]}>
+              <View style={styles.heroCurveRim} />
+              <Image source={HERO_MAP_IMAGE} style={styles.heroMapImage} />
+            </View>
           </View>
+        </ImageBackground>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statCardIcon}>🏡</Text>
-            <Text style={styles.statCardNumber}>{stats.villaProjects}</Text>
-            <Text style={styles.statCardLabel}>Villa</Text>
-          </View>
+        <Text style={styles.sectionHeading}>Acces rapides</Text>
+        <View style={[styles.quickRow, isCompact && styles.quickColumn]}>
+          <QuickCard
+            title="Explorer la Carte"
+            subtitle="Visualisez tous les projets sur la carte interactive"
+            buttonLabel="Explorer"
+            imageSource={QUICK_MAP_IMAGE}
+            onPress={() => router.push("/(tabs)/explore")}
+            icon="⌖"
+          />
+          <QuickCard
+            title="Ajouter un Projet"
+            subtitle="Creez et geolocalisez un nouveau projet"
+            buttonLabel="Ajouter"
+            imageSource={QUICK_PROJECT_IMAGE}
+            onPress={() => router.push("/(tabs)/AddProject")}
+            icon="✚"
+          />
+          <QuickCard
+            title="Dashboards"
+            subtitle="Suivez vos KPIs et analysez vos donnees"
+            buttonLabel="Consulter"
+            imageSource={QUICK_DASHBOARD_IMAGE}
+            onPress={() => router.push("/(tabs)/dashboard")}
+            icon="▤"
+          />
+        </View>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statCardIcon}>🏘️</Text>
-            <Text style={styles.statCardNumber}>{stats.lotProjects}</Text>
-            <Text style={styles.statCardLabel}>Lots</Text>
-          </View>
+        <View style={styles.overviewCard}>
+          <Text style={styles.overviewTitle}>Vue d'ensemble</Text>
+          <View style={[styles.overviewGrid, isCompact && styles.overviewStack]}>
+            <View style={styles.overviewMainCol}>
+              <Text style={styles.overviewBigNumber}>{stats.totalProjects}</Text>
+              <Text style={styles.overviewMainLabel}>Projets Total</Text>
+              <View style={styles.progressLineTrack}>
+                <View style={[styles.progressLineFill, { width: `${progress}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{Math.round(progress)}%</Text>
+            </View>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statCardIcon}>🛍️</Text>
-            <Text style={styles.statCardNumber}>{stats.retailProjects}</Text>
-            <Text style={styles.statCardLabel}>Retail</Text>
+            <StatMini icon="🏢" value={stats.collectifProjects} label="Collectif" />
+            <StatMini icon="🏡" value={stats.villaProjects} label="Villa" />
+            <StatMini icon="🏘" value={stats.lotProjects} label="Lots" />
+            <StatMini icon="🛍" value={stats.retailProjects} label="Retail" />
           </View>
         </View>
-      </View>
 
-      {/* === FONCTIONNALITÉS CLÉS === */}
-      <View style={styles.featuresSection}>
-        <Text style={styles.sectionTitle}>✨ Fonctionnalités</Text>
+        <View style={[styles.bottomRow, isCompact && styles.quickColumn]}>
+          <View style={styles.bottomLeftCol}>
+            <View style={styles.infoCardBlock}>
+              <Text style={styles.bottomBlockTitle}>Fonctionnalites cles</Text>
+              <View style={styles.featureGrid}>
+                <FeaturePill icon="🎯" title="Marqueurs Personnalisables" subtitle="Ajustez taille, couleur et style" />
+                <FeaturePill icon="🛰" title="Vues Multiples" subtitle="Standard, Satellite, Hybrid" />
+                <FeaturePill icon="📋" title="Donnees Detaillees" subtitle="Toutes les infos au meme endroit" />
+                <FeaturePill icon="🔄" title="Synchronisation Temps Reel" subtitle="Toujours a jour et accessibles" />
+              </View>
+            </View>
 
-        <View style={styles.featureItem}>
-          <View style={styles.featureIconContainer}>
-            <Text style={styles.featureIcon}>🎯</Text>
+            <View style={styles.infoCardBlock}>
+              <Text style={styles.bottomBlockTitle}>A savoir</Text>
+              <KnowItem title="Commencez Maintenant" text="Cliquez sur Ajouter Projet pour creer votre premier projet immobilier" tone="pink" />
+              <KnowItem title="Personnalisez" text="Explorez les parametres des marqueurs pour adapter l'affichage" tone="blue" />
+              <KnowItem title="Analysez" text="Cliquez sur chaque marqueur pour voir les details complets" tone="teal" />
+            </View>
           </View>
-          <View style={styles.featureContent}>
-            <Text style={styles.featureTitle}>Marqueurs Personnalisables</Text>
-            <Text style={styles.featureDescription}>
-              Ajustez la taille, couleur et style des marqueurs selon vos besoins
+
+          <View style={styles.pptCard}>
+            <Text style={styles.evolutionLabel}>Prochaine evolution</Text>
+            <Text style={styles.pptTitle}>Export Benchmark PPT</Text>
+            <Text style={styles.pptDesc}>
+              Generez automatiquement des decks de benchmark professionnels a partir de vos donnees.
             </Text>
+            <Image source={PPT_PREVIEW_IMAGE} style={styles.pptImage} />
+            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.88}>
+              <Text style={styles.primaryButtonText}>En savoir plus</Text>
+            </TouchableOpacity>
           </View>
         </View>
-
-        <View style={styles.featureItem}>
-          <View style={styles.featureIconContainer}>
-            <Text style={styles.featureIcon}>🛰️</Text>
-          </View>
-          <View style={styles.featureContent}>
-            <Text style={styles.featureTitle}>Vues Multiples</Text>
-            <Text style={styles.featureDescription}>
-              Standard, Satellite, Hybrid et Relief pour une analyse complète
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.featureItem}>
-          <View style={styles.featureIconContainer}>
-            <Text style={styles.featureIcon}>📋</Text>
-          </View>
-          <View style={styles.featureContent}>
-            <Text style={styles.featureTitle}>Données Détaillées</Text>
-            <Text style={styles.featureDescription}>
-              Toutes les informations d'un projet au même endroit
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.featureItem}>
-          <View style={styles.featureIconContainer}>
-            <Text style={styles.featureIcon}>💾</Text>
-          </View>
-          <View style={styles.featureContent}>
-            <Text style={styles.featureTitle}>Synchronisation Temps Réel</Text>
-            <Text style={styles.featureDescription}>
-              Vos données sont toujours à jour et accessibles
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* === INFO CARDS === */}
-      <View style={styles.infoSection}>
-        <Text style={styles.sectionTitle}>💡 À Savoir</Text>
-
-        <View style={[styles.infoCard, { borderLeftColor: AppColors.accent }]}>
-          <Text style={styles.infoCardTitle}>Commencez Maintenant</Text>
-          <Text style={styles.infoCardText}>
-            Cliquez sur "Ajouter Projet" pour créer votre premier projet immobilier
-          </Text>
-        </View>
-
-        <View style={[styles.infoCard, { borderLeftColor: AppColors.primary.light }]}>
-          <Text style={styles.infoCardTitle}>Personnalisez</Text>
-          <Text style={styles.infoCardText}>
-            Explorez les paramètres des marqueurs pour adapter l'affichage à vos préférences
-          </Text>
-        </View>
-
-        <View style={[styles.infoCard, { borderLeftColor: AppColors.primary.main }]}>
-          <Text style={styles.infoCardTitle}>Analysez</Text>
-          <Text style={styles.infoCardText}>
-            Cliquez sur chaque marqueur pour voir les détails complets du projet
-          </Text>
-        </View>
-      </View>
-
-      {/* === FOOTER === */}
-      <View style={styles.footer}>
-        <LogoHeader size="small" showText={true} centered={true} />
-        <Text style={styles.footerText}>
-          Real Estate Mapper v1.0
-        </Text>
-        <Text style={styles.footerSubtext}>
-          Plateforme de gestion immobilière innovante
-        </Text>
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
+const SidebarItem = ({
+  label,
+  icon,
+  active,
+  onPress,
+}: {
+  label: string;
+  icon: string;
+  active?: boolean;
+  onPress?: () => void;
+}) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={0.85}
+    style={[styles.sidebarItem, active && styles.sidebarItemActive]}
+  >
+    <Text style={[styles.sidebarIcon, active && styles.sidebarIconActive]}>{icon}</Text>
+    <Text style={[styles.sidebarItemText, active && styles.sidebarItemTextActive]}>{label}</Text>
+  </TouchableOpacity>
+);
+
+const Badge = ({ text }: { text: string }) => (
+  <View style={styles.badge}>
+    <Text style={styles.badgeText}>{text}</Text>
+  </View>
+);
+
+const QuickCard = ({
+  title,
+  subtitle,
+  buttonLabel,
+  imageSource,
+  onPress,
+  icon,
+}: {
+  title: string;
+  subtitle: string;
+  buttonLabel: string;
+  imageSource: { uri: string };
+  onPress: () => void;
+  icon: string;
+}) => (
+  <View style={styles.quickCard}>
+    <View style={styles.quickCardTop}>
+      <View style={styles.quickTitleRow}>
+        <View style={styles.quickIconWrap}>
+          <Text style={styles.quickIcon}>{icon}</Text>
+        </View>
+        <View style={styles.quickTitleCol}>
+          <Text style={styles.quickCardTitle}>{title}</Text>
+          <Text style={styles.quickCardSubtitle}>{subtitle}</Text>
+        </View>
+      </View>
+
+      <Image source={imageSource} style={styles.quickCardImage} />
+    </View>
+
+    <TouchableOpacity style={styles.secondaryButton} onPress={onPress} activeOpacity={0.88}>
+      <Text style={styles.secondaryButtonText}>{buttonLabel}</Text>
+    </TouchableOpacity>
+  </View>
+);
+
+const StatMini = ({ icon, value, label }: { icon: string; value: number; label: string }) => (
+  <View style={styles.statMiniCard}>
+    <Text style={styles.statMiniIcon}>{icon}</Text>
+    <Text style={styles.statMiniValue}>{value}</Text>
+    <Text style={styles.statMiniLabel}>{label}</Text>
+  </View>
+);
+
+const FeaturePill = ({ icon, title, subtitle }: { icon: string; title: string; subtitle: string }) => (
+  <View style={styles.featurePill}>
+    <Text style={styles.featureIcon}>{icon}</Text>
+    <View style={styles.featureTextWrap}>
+      <Text style={styles.featureTitle}>{title}</Text>
+      <Text style={styles.featureSubtitle}>{subtitle}</Text>
+    </View>
+  </View>
+);
+
+const KnowItem = ({ title, text, tone }: { title: string; text: string; tone: "pink" | "blue" | "teal" }) => (
+  <View
+    style={[
+      styles.knowItem,
+      tone === "pink" && styles.knowPink,
+      tone === "blue" && styles.knowBlue,
+      tone === "teal" && styles.knowTeal,
+    ]}
+  >
+    <View style={styles.knowTextWrap}>
+      <Text style={styles.knowTitle}>{title}</Text>
+      <Text style={styles.knowDesc}>{text}</Text>
+    </View>
+    <Text style={styles.knowArrow}>›</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
-    backgroundColor: AppColors.ui.background,
+    flexDirection: "row",
+    backgroundColor: "#F4F8FC",
   },
-
-  // === HERO HEADER ===
-  heroHeader: {
-    backgroundColor: AppColors.primary.main,
-    paddingVertical: 50,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 30,
+  sidebar: {
+    width: SIDEBAR_WIDTH,
+    backgroundColor: "#08365A",
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 8,
+    justifyContent: "space-between",
   },
-
-  heroOverlay: {
-    alignItems: 'center',
+  logoWrap: {
+    alignItems: "center",
+    gap: 6,
   },
-
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: AppColors.ui.background,
-    fontFamily: 'Century Gothic',
-    marginBottom: 8,
-    textAlign: 'center',
+  logoImage: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
   },
-
-  heroSubtitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: AppColors.primary.light,
-    fontFamily: 'Century Gothic',
-    marginBottom: 12,
-    textAlign: 'center',
+  logoText: {
+    color: "#D4E9F5",
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: "700",
+    textAlign: "center",
   },
-
-  heroDescription: {
+  sidebarNav: {
+    gap: 10,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  sidebarItem: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    gap: 4,
+  },
+  sidebarItemActive: {
+    backgroundColor: "#1E5E87",
+  },
+  sidebarIcon: {
+    color: "#B7D1E3",
     fontSize: 14,
-    color: AppColors.gray.lightest,
-    fontFamily: 'Century Gothic',
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 300,
+    fontWeight: "700",
   },
-
-  // === ACTIONS SECTION ===
-  actionsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 30,
+  sidebarIconActive: {
+    color: "#FFFFFF",
+  },
+  sidebarItemText: {
+    color: "#D4E9F5",
+    fontSize: 10,
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  sidebarItemTextActive: {
+    color: "#FFFFFF",
+  },
+  sidebarFooter: {
+    alignItems: "center",
+    gap: 8,
+  },
+  sidebarFooterText: {
+    color: "#D4E9F5",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  modePill: {
+    width: 50,
+    height: 24,
+    borderRadius: 14,
+    backgroundColor: "#0E4A72",
+    paddingHorizontal: 6,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  modeDotOff: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: "#FFED7A",
+  },
+  modeDotOn: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: "#74D1FF",
+  },
+  main: {
+    flex: 1,
+  },
+  mainContent: {
+    padding: 14,
     gap: 12,
   },
-
-  actionCard: {
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+  hero: {
+    minHeight: 252,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#DCEAF3",
   },
-
-  actionCardPrimary: {
-    backgroundColor: AppColors.primary.main,
+  heroCompact: {
+    minHeight: 220,
   },
-
-  actionCardSecondary: {
-    backgroundColor: AppColors.primary.light,
+  heroImage: {
+    resizeMode: "cover",
+    opacity: 0.98,
   },
-
-  actionCardIcon: {
-    fontSize: 40,
+  heroOverlay: {
+    flex: 1,
+    flexDirection: "row",
+    position: "relative",
+  },
+  heroSoftLight: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(245,250,255,0.06)",
+  },
+  heroLeft: {
+    width: "64%",
+    paddingVertical: 24,
+    paddingHorizontal: 28,
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.30)",
+  },
+  heroLeftCompact: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    width: "66%",
+  },
+  heroRightClip: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: "40.5%",
+    borderTopLeftRadius: 210,
+    borderBottomLeftRadius: 210,
+    overflow: "hidden",
+    backgroundColor: "#E4F1FA",
+  },
+  heroRightClipCompact: {
+    width: "41.5%",
+    borderTopLeftRadius: 142,
+    borderBottomLeftRadius: 142,
+  },
+  heroCurveRim: {
+    position: "absolute",
+    top: -4,
+    bottom: -4,
+    left: -42,
+    width: 78,
+    borderTopRightRadius: 210,
+    borderBottomRightRadius: 210,
+    backgroundColor: "rgba(255,255,255,0.78)",
+    zIndex: 2,
+  },
+  heroMapImage: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.98,
+  },
+  heroTitle: {
+    color: "#11365B",
+    fontSize: 34,
+    lineHeight: 41,
+    fontWeight: "800",
+    fontFamily: "Century Gothic",
+    maxWidth: 700,
+  },
+  heroTitleCompact: {
+    fontSize: 30,
+    lineHeight: 36,
+    maxWidth: 480,
+  },
+  heroSubtitle: {
+    color: "#355B77",
+    fontSize: 15,
+    lineHeight: 23,
+    marginTop: 9,
+    maxWidth: 620,
+    fontFamily: "Century Gothic",
+  },
+  heroSubtitleCompact: {
+    fontSize: 14,
+    lineHeight: 21,
+    maxWidth: 420,
+    marginTop: 8,
+  },
+  badgesRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  badge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.86)",
+    borderWidth: 1,
+    borderColor: "#D8EAF5",
+  },
+  badgeText: {
+    color: "#2D5876",
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: "Century Gothic",
+  },
+  sectionHeading: {
+    color: "#1A3E5A",
+    fontSize: 26,
+    fontWeight: "800",
+    fontFamily: "Century Gothic",
+    marginTop: 6,
+  },
+  quickRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  quickColumn: {
+    flexDirection: "column",
+  },
+  quickCard: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCEAF3",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    minHeight: 130,
+  },
+  quickCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  quickTitleRow: {
+    flexDirection: "row",
+    gap: 10,
+    flex: 1,
+  },
+  quickIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    backgroundColor: "#E7F4FB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickIcon: {
+    color: "#0D88AF",
+    fontWeight: "700",
+    fontSize: 18,
+  },
+  quickTitleCol: {
+    flex: 1,
+  },
+  quickCardTitle: {
+    color: "#1A3E5A",
+    fontSize: 20,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+  quickCardSubtitle: {
+    color: "#54728B",
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 4,
+    fontFamily: "Century Gothic",
+  },
+  quickCardImage: {
+    width: 120,
+    height: 78,
+    borderRadius: 10,
+  },
+  secondaryButton: {
+    alignSelf: "flex-start",
+    marginTop: 12,
+    backgroundColor: "#1094B7",
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  secondaryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 13,
+    fontFamily: "Century Gothic",
+  },
+  overviewCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCEAF3",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+  },
+  overviewTitle: {
+    color: "#1A3E5A",
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 10,
+    fontFamily: "Century Gothic",
+  },
+  overviewGrid: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "stretch",
+  },
+  overviewStack: {
+    flexWrap: "wrap",
+  },
+  overviewMainCol: {
+    minWidth: 180,
+    flex: 1.2,
+    borderRightWidth: 1,
+    borderRightColor: "#E6F0F7",
+    paddingRight: 10,
+    justifyContent: "center",
+  },
+  overviewBigNumber: {
+    color: "#1094B7",
+    fontSize: 52,
+    lineHeight: 54,
+    fontWeight: "800",
+    fontFamily: "Century Gothic",
+  },
+  overviewMainLabel: {
+    color: "#35607A",
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 2,
+    marginBottom: 8,
+    fontFamily: "Century Gothic",
+  },
+  progressLineTrack: {
+    height: 7,
+    borderRadius: 99,
+    backgroundColor: "#E3EEF6",
+    overflow: "hidden",
+  },
+  progressLineFill: {
+    height: "100%",
+    borderRadius: 99,
+    backgroundColor: "#1094B7",
+  },
+  progressText: {
+    color: "#5C7C93",
+    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+  statMiniCard: {
+    flex: 1,
+    minWidth: 102,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E0ECF5",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FCFEFF",
+  },
+  statMiniIcon: {
+    fontSize: 20,
+    marginBottom: 5,
+  },
+  statMiniValue: {
+    color: "#1C4E72",
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: "800",
+    fontFamily: "Century Gothic",
+  },
+  statMiniLabel: {
+    color: "#567287",
+    fontSize: 13,
+    marginTop: 2,
+    fontWeight: "600",
+    fontFamily: "Century Gothic",
+  },
+  bottomRow: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "flex-start",
+  },
+  bottomLeftCol: {
+    flex: 1.6,
+    gap: 12,
+  },
+  infoCardBlock: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCEAF3",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+  },
+  bottomBlockTitle: {
+    color: "#1A3E5A",
+    fontSize: 22,
+    fontWeight: "800",
+    marginBottom: 10,
+    fontFamily: "Century Gothic",
+  },
+  featureGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  featurePill: {
+    width: "48.5%",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E2EDF6",
+    backgroundColor: "#FBFDFF",
+    padding: 10,
+    flexDirection: "row",
+    gap: 8,
+  },
+  featureIcon: {
+    fontSize: 20,
+  },
+  featureTextWrap: {
+    flex: 1,
+  },
+  featureTitle: {
+    color: "#18476A",
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+  featureSubtitle: {
+    color: "#5A768D",
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+    fontFamily: "Century Gothic",
+  },
+  knowItem: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  knowTextWrap: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  knowTitle: {
+    color: "#194C6F",
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+  knowDesc: {
+    color: "#5B758A",
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: "Century Gothic",
+  },
+  knowArrow: {
+    color: "#3A6A86",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  knowPink: {
+    backgroundColor: "#FFF3F7",
+    borderColor: "#FAD4E1",
+  },
+  knowBlue: {
+    backgroundColor: "#F2FAFF",
+    borderColor: "#D1E9F8",
+  },
+  knowTeal: {
+    backgroundColor: "#EFFCFB",
+    borderColor: "#CBF1EC",
+  },
+  pptCard: {
+    flex: 1,
+    minWidth: 260,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#DCEAF3",
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+  },
+  evolutionLabel: {
+    color: "#6E90A9",
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    fontFamily: "Century Gothic",
+  },
+  pptTitle: {
+    color: "#1A3E5A",
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: "800",
+    marginTop: 4,
+    fontFamily: "Century Gothic",
+  },
+  pptDesc: {
+    color: "#4C6D84",
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 8,
+    marginBottom: 10,
+    fontFamily: "Century Gothic",
+  },
+  pptImage: {
+    width: "100%",
+    height: 145,
+    borderRadius: 10,
     marginBottom: 10,
   },
-
-  actionCardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: AppColors.ui.background,
-    fontFamily: 'Century Gothic',
-    marginBottom: 4,
-  },
-
-  actionCardDesc: {
-    fontSize: 13,
-    color: AppColors.gray.lightest,
-    fontFamily: 'Century Gothic',
-  },
-
-  // === STATS SECTION ===
-  statsSection: {
+  primaryButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "#0E89AF",
+    borderRadius: 22,
     paddingHorizontal: 16,
-    marginBottom: 30,
+    paddingVertical: 9,
   },
-
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: AppColors.primary.main,
-    fontFamily: 'Century Gothic',
-    marginBottom: 16,
-  },
-
-  mainStat: {
-    backgroundColor: AppColors.gray.lightest,
-    padding: 24,
-    borderRadius: 16,
-    marginBottom: 16,
-    alignItems: 'center',
-    borderLeftWidth: 5,
-    borderLeftColor: AppColors.primary.main,
-  },
-
-  mainStatNumber: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: AppColors.primary.main,
-    fontFamily: 'Century Gothic',
-    marginBottom: 8,
-  },
-
-  mainStatLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: AppColors.ui.text,
-    fontFamily: 'Century Gothic',
-    marginBottom: 12,
-  },
-
-  statBarContainer: {
-    width: '100%',
-    height: 8,
-    backgroundColor: AppColors.gray.light,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-
-  statBar: {
-    height: '100%',
-    backgroundColor: AppColors.primary.light,
-    borderRadius: 4,
-  },
-
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
-  },
-
-  statCard: {
-    width: '48%',
-    backgroundColor: AppColors.ui.background,
-    borderWidth: 2,
-    borderColor: AppColors.primary.light,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  statCardIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-
-  statCardNumber: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: AppColors.primary.main,
-    fontFamily: 'Century Gothic',
-    marginBottom: 4,
-  },
-
-  statCardLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: AppColors.ui.text,
-    fontFamily: 'Century Gothic',
-    textAlign: 'center',
-  },
-
-  // === FEATURES SECTION ===
-  featuresSection: {
-    paddingHorizontal: 16,
-    marginBottom: 30,
-  },
-
-  featureItem: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-
-  featureIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: AppColors.primary.light,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  featureIcon: {
-    fontSize: 28,
-  },
-
-  featureContent: {
-    flex: 1,
-  },
-
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: AppColors.primary.main,
-    fontFamily: 'Century Gothic',
-    marginBottom: 4,
-  },
-
-  featureDescription: {
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
     fontSize: 13,
-    color: AppColors.ui.text,
-    fontFamily: 'Century Gothic',
-    lineHeight: 18,
-  },
-
-  // === INFO SECTION ===
-  infoSection: {
-    paddingHorizontal: 16,
-    marginBottom: 30,
-  },
-
-  infoCard: {
-    backgroundColor: AppColors.gray.lightest,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderLeftWidth: 5,
-  },
-
-  infoCardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: AppColors.primary.main,
-    fontFamily: 'Century Gothic',
-    marginBottom: 6,
-  },
-
-  infoCardText: {
-    fontSize: 13,
-    color: AppColors.ui.text,
-    fontFamily: 'Century Gothic',
-    lineHeight: 18,
-  },
-
-  // === FOOTER ===
-  footer: {
-    backgroundColor: AppColors.primary.main,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-
-  footerText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: AppColors.ui.background,
-    fontFamily: 'Century Gothic',
-    marginBottom: 4,
-  },
-
-  footerSubtext: {
-    fontSize: 12,
-    color: AppColors.primary.light,
-    fontFamily: 'Century Gothic',
+    fontFamily: "Century Gothic",
   },
 });

@@ -74,7 +74,26 @@ type HotelServiceItem = {
   surface?: string;
 };
 
-const projectMainTypes = ["Collectif", "Villa", "Lot de villas", "Retail", "Mixte", "Bureau", "Santé", "Hotel"];
+type SpaceCapacityItem = {
+  name: string;
+  capacity: string;
+  surface: string;
+};
+
+const projectMainTypes = [
+  "Collectif",
+  "Villa",
+  "Lot de villas",
+  "Retail",
+  "Mixte",
+  "Bureau",
+  "Santé",
+  "Hotel",
+  "Loisir",
+  "Sport",
+  "Education",
+  "Art et culture",
+];
 
 const projectMixedTypes = [
   "Collectif/Villa",
@@ -259,6 +278,10 @@ const retailStatusOptions = ["En exploitation", "En cours de construction", "Ann
 const officeStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
 const healthStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
 const hotelStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
+const sportStatusOptions = ["En exploitation", "En cours de construction", "Annoncé"];
+const educationStatusOptions = ["En exploitation", "En construction", "Annoncé"];
+const artCultureStatusOptions = ["En exploitation", "En construction", "Annoncé", "En rénovation"];
+const leisureStatusOptions = ["En exploitation", "En construction", "Annoncé", "En rénovation"];
 
 const retailTypologyOptions = ["Centre urbain", "Centre de proximité", "Centre lifestyle", "Retail park", "Mall régional", "Autre"];
 const retailFoodTypeOptions = [
@@ -279,6 +302,349 @@ const retailFoodTypeOptions = [
 ];
 const clinicTypologyOptions = ["Clinique privée", "Clinique spécialisée", "Polyclinique", "Autre"];
 const hotelCategoryOptions = ["5 étoiles", "4 étoiles", "3 étoiles", "2 étoiles", "1 étoile", "RH", "RIPT", "Autre"];
+const sportSubtypeOptions = [
+  "Salle de sport",
+  "Complexe sportif",
+  "Club privé",
+  "Country Club",
+  "Golf Club",
+  "Padel Club",
+  "Tennis Club",
+  "Centre aquatique",
+  "Centre équestre",
+  "Académie sportive",
+  "Centre multisports",
+  "Sports & Entertainment Hub",
+];
+const sportTargetOptions = [
+  "Familles",
+  "Professionnels",
+  "Entreprises",
+  "Jeunes",
+  "Étudiants",
+  "Enfants",
+  "Seniors",
+  "Touristes",
+  "Sportifs amateurs",
+  "Sportifs professionnels",
+  "Membres premium",
+];
+const sportActivityOptions = [
+  "Fitness",
+  "Musculation",
+  "Cardio",
+  "Yoga",
+  "Pilates",
+  "CrossFit",
+  "Natation",
+  "Tennis",
+  "Padel",
+  "Football",
+  "Basketball",
+  "Boxe",
+  "Arts martiaux",
+  "Danse",
+  "Golf",
+  "Escalade",
+  "Cyclisme",
+  "Autre",
+];
+const sportEquipmentOptions = [
+  "Salle de sport",
+  "Piscine",
+  "Spa",
+  "Sauna",
+  "Hammam",
+  "Studios",
+  "Terrains sportifs",
+  "Vestiaires",
+  "Salle polyvalente",
+  "Salle de réunion",
+  "Coworking",
+  "Boutique",
+  "Parking",
+  "Autre",
+];
+const sportServiceOptions = [
+  "Coaching",
+  "Coaching personnalisé",
+  "Nutrition",
+  "Physiothérapie",
+  "Conciergerie",
+  "Réservation en ligne",
+  "Application mobile",
+  "Kids Club",
+  "Événements",
+  "Location d'équipements",
+  "Personal Training",
+  "Autre",
+];
+const commonFnbOptions = [
+  "Restaurant",
+  "Café / Coffee Shop",
+  "Bar",
+  "Lounge",
+  "Fast Food / QSR",
+  "Bakery / Pâtisserie",
+  "Snack",
+  "Food Court",
+  "Ice Cream",
+];
+const sportBusinessModelOptions = [
+  "Abonnement annuel",
+  "Frais d'adhésion + abonnement",
+  "Paiement à la séance",
+  "Membership privé",
+  "Freemium",
+  "Corporate (B2B)",
+  "Public",
+  "Public-Privé",
+  "Association / Club",
+  "Franchise",
+  "Resort / Hôtel",
+  "Municipal",
+  "Sponsoring & événements",
+  "Mixte",
+];
+const educationSubtypeOptions = [
+  "Préscolaire",
+  "École / Groupe scolaire",
+  "After School & Activités éducatives",
+  "École internationale",
+  "Enseignement supérieur spécialisé",
+  "Université",
+  "Formation professionnelle / Post-bac court",
+  "Centre de recherche",
+];
+const educationPublicTargetOptions = ["Enfants", "Collégiens", "Lycéens", "Étudiants", "Professionnels", "Entreprises", "Autre"];
+const educationProgramsOptions = [
+  "Préscolaire",
+  "Primaire",
+  "Collège",
+  "Lycée",
+  "Cycle préparatoire",
+  "Diplôme d'ingénieur",
+  "Licence",
+  "Master",
+  "MBA",
+  "Doctorat",
+  "Formation continue",
+  "Certification",
+  "Autre",
+];
+const educationAxesOptions = [
+  "Génie industriel",
+  "Data & IA",
+  "Informatique",
+  "Énergies renouvelables",
+  "Architecture",
+  "Business",
+  "Santé",
+  "Supply Chain",
+  "Autre",
+];
+const educationEquipmentOptions = [
+  "Amphithéâtres",
+  "Salles de classe",
+  "Laboratoires",
+  "Bibliothèque",
+  "Résidences étudiantes",
+  "Centre sportif",
+  "Cafétéria",
+  "Auditorium",
+  "Espaces verts",
+  "Coworking",
+  "Parking",
+  "Autre",
+];
+const educationServicesOptions = [
+  "Transport scolaire",
+  "Hébergement",
+  "Orientation",
+  "Incubateur",
+  "Bibliothèque numérique",
+  "Wi-Fi",
+  "Carrière",
+  "Échanges internationaux",
+  "Santé",
+  "Conciergerie",
+  "Autre",
+];
+const educationContractOptions = ["Public", "Privé", "PPP", "Fondation", "Associatif", "International", "Autre"];
+const educationBusinessModelOptions = [
+  "Financement public",
+  "PPP",
+  "Fondation",
+  "Sponsoring",
+  "Formation continue",
+  "Recherche",
+  "Mixte",
+];
+const artCultureSubtypeOptions = [
+  "Musée",
+  "Centre culturel",
+  "Galerie d'art",
+  "Théâtre",
+  "Opéra",
+  "Salle de spectacle",
+  "Centre des arts vivants",
+  "Cinéma",
+  "Auditorium",
+  "Conservatoire",
+  "Centre d'exposition",
+  "Fondation culturelle",
+  "Bibliothèque",
+  "Médiathèque",
+  "Autre",
+];
+const artCulturePublicTargetOptions = [
+  "Grand public",
+  "Familles",
+  "Enfants",
+  "Jeunes",
+  "Professionnels",
+  "Artistes",
+  "Touristes",
+  "Entreprises",
+  "CSP+",
+  "Autre",
+];
+const artCultureActivitiesOptions = [
+  "Théâtre",
+  "Danse",
+  "Ballet",
+  "Concerts",
+  "Opéra",
+  "Festivals",
+  "Expositions",
+  "Cinéma",
+  "Conférences",
+  "Ateliers",
+  "Autres",
+];
+const artCultureEquipmentOptions = [
+  "Salle de spectacle",
+  "Auditorium",
+  "Scène",
+  "Galerie",
+  "Espaces d'exposition",
+  "Salles de répétition",
+  "Ateliers artistiques",
+  "Bibliothèque",
+  "Boutique",
+  "Restaurant",
+  "Café",
+  "Parking",
+  "Autres",
+];
+const artCultureServicesOptions = [
+  "Billetterie",
+  "Visites guidées",
+  "Médiation culturelle",
+  "Ateliers",
+  "Location d'espaces",
+  "Événements privés",
+  "Audioguides",
+  "Réservation en ligne",
+  "Accessibilité PMR",
+  "Autres",
+];
+const artCultureManagementOptions = ["Public", "Privé", "Fondation", "Associatif", "PPP", "Institution culturelle", "Mixte", "Autre"];
+const artCultureBusinessModelOptions = [
+  "Subventions publiques",
+  "Mécénat",
+  "Sponsoring",
+  "Location d'espaces",
+  "Événements privés",
+  "Boutique",
+  "F&B",
+  "Donations",
+  "Mixte",
+  "Autres",
+];
+const artCulturePartnerOptions = ["Ministère de la Culture", "Ville", "Fondations", "Institutions internationales", "Autres"];
+const artCultureLabelsOptions = ["UNESCO", "Label patrimoine", "ISO", "Autre"];
+const leisureSubtypeOptions = [
+  "Parc d'attractions",
+  "Parc à thème",
+  "Parc aquatique",
+  "Parc de loisirs",
+  "Entertainment Center",
+  "FEC",
+  "Bowling",
+  "Karting",
+  "Laser Game",
+  "Escape Game",
+  "Trampoline Park",
+  "Cinéma",
+  "Zoo",
+  "Aquarium",
+  "Beach Club",
+  "Complexe de loisirs",
+  "Autre",
+];
+const leisurePublicTargetOptions = [
+  "Familles",
+  "Enfants",
+  "Adolescents",
+  "Jeunes adultes",
+  "Adultes",
+  "Seniors",
+  "Touristes",
+  "Entreprises",
+  "Autres",
+];
+const leisureActivitiesOptions = [
+  "Manèges",
+  "Attractions aquatiques",
+  "Jeux",
+  "Karting",
+  "Bowling",
+  "Laser Game",
+  "Escape Game",
+  "VR",
+  "Spectacles",
+  "Mini-golf",
+  "Autres",
+];
+const leisureEquipmentOptions = [
+  "Attractions",
+  "Piscines",
+  "Aires de jeux",
+  "Terrains de loisirs",
+  "Salles de jeux",
+  "Espaces événementiels",
+  "Vestiaires",
+  "Parking",
+  "Autres",
+];
+const leisureServicesOptions = [
+  "Billetterie",
+  "Réservation en ligne",
+  "Location d'espaces",
+  "Anniversaires",
+  "Événements privés",
+  "Groupes scolaires",
+  "Groupes entreprises",
+  "Parking",
+  "Sécurité",
+  "Autre",
+];
+const leisureSeasonalityOptions = ["Forte saison estivale", "Activité toute l'année"];
+const leisureManagementOptions = ["Public", "Privé", "PPP", "Fondation", "Franchise", "Gestion directe", "Gestion déléguée", "Mixte", "Autre"];
+const leisureBusinessModelOptions = [
+  "Abonnement / Pass annuel",
+  "F&B",
+  "Location d'espaces",
+  "Événements privés",
+  "Sponsoring",
+  "Merchandising",
+  "Parking",
+  "Publicité",
+  "Activités payantes",
+  "Mixte",
+  "Autre",
+];
 
 type AutoNextTextInputProps = React.ComponentProps<typeof RNTextInput>;
 const autoNextInputRegistry: RNTextInput[] = [];
@@ -363,6 +729,9 @@ const projectComponentsOptions = [
   "Commerces",
   "Bureaux",
   "Hôtel",
+  "Sport",
+  "Education",
+  "Art et culture",
   "Espaces verts",
   "Parking",
   "Loisirs",
@@ -379,6 +748,8 @@ const toggleSelection = (
     setSelected([...selected, option]);
   }
 };
+
+const hasOtherSelected = (selected: string[]) => selected.some((item) => item.toLowerCase() === "autre" || item.toLowerCase() === "autres");
 
 const businessModelOptions = ["vente", "location", "mixte vente-location", "autre"];
 const standingOptions = [
@@ -444,6 +815,8 @@ const cleanupPercentValue = (text: string) => {
   return `${parts[0]}.${parts.slice(1).join("")}`;
 };
 
+const withSuffix = (value: string, suffix: string) => (value ? `${value} ${suffix}` : "");
+
 const filterSuggestions = (value: string, list: string[]) => {
   const query = value.trim().toLowerCase();
   if (!query) return list;
@@ -460,6 +833,14 @@ const getStatusOptionsByProjectType = (projectType: string) => {
       return healthStatusOptions;
     case "Hotel":
       return hotelStatusOptions;
+    case "Sport":
+      return sportStatusOptions;
+    case "Education":
+      return educationStatusOptions;
+    case "Art et culture":
+      return artCultureStatusOptions;
+    case "Loisir":
+      return leisureStatusOptions;
     default:
       return statusOptions;
   }
@@ -693,6 +1074,124 @@ export default function AddProjectScreen() {
   const [hotelLeisureInput, setHotelLeisureInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", count: "", surface: "" });
   const [editingHotelLeisureIndex, setEditingHotelLeisureIndex] = useState<number | null>(null);
 
+  const [sportSubtype, setSportSubtype] = useState("");
+  const [sportCreationDate, setSportCreationDate] = useState("");
+  const [sportRenovationDate, setSportRenovationDate] = useState("");
+  const [sportFloors, setSportFloors] = useState("");
+  const [sportCapacity, setSportCapacity] = useState("");
+  const [sportPositioning, setSportPositioning] = useState("");
+  const [sportTargets, setSportTargets] = useState<string[]>([]);
+  const [sportDescription, setSportDescription] = useState("");
+  const [sportActivities, setSportActivities] = useState<string[]>([]);
+  const [sportActivitiesOther, setSportActivitiesOther] = useState("");
+  const [sportEquipments, setSportEquipments] = useState<string[]>([]);
+  const [sportEquipmentsOther, setSportEquipmentsOther] = useState("");
+  const [sportServices, setSportServices] = useState<string[]>([]);
+  const [sportServicesOther, setSportServicesOther] = useState("");
+  const [sportFnb, setSportFnb] = useState<string[]>([]);
+  const [sportFnbOther, setSportFnbOther] = useState("");
+  const [sportPricingMembershipFee, setSportPricingMembershipFee] = useState("");
+  const [sportPricingMonthly, setSportPricingMonthly] = useState("");
+  const [sportPricingAnnual, setSportPricingAnnual] = useState("");
+  const [sportPricingDaily, setSportPricingDaily] = useState("");
+  const [sportPricingPerActivity, setSportPricingPerActivity] = useState("");
+  const [sportCurrentMembers, setSportCurrentMembers] = useState("");
+  const [sportRenewalRate, setSportRenewalRate] = useState("");
+  const [sportLabels, setSportLabels] = useState("");
+  const [sportBusinessModels, setSportBusinessModels] = useState<string[]>([]);
+
+  const [educationSubtype, setEducationSubtype] = useState("");
+  const [educationCreationDate, setEducationCreationDate] = useState("");
+  const [educationRenovationDate, setEducationRenovationDate] = useState("");
+  const [educationFloors, setEducationFloors] = useState("");
+  const [educationCapacity, setEducationCapacity] = useState("");
+  const [educationStudents, setEducationStudents] = useState("");
+  const [educationIntlStudents, setEducationIntlStudents] = useState("");
+  const [educationTeachers, setEducationTeachers] = useState("");
+  const [educationPositioning, setEducationPositioning] = useState("");
+  const [educationTargets, setEducationTargets] = useState<string[]>([]);
+  const [educationTargetsOther, setEducationTargetsOther] = useState("");
+  const [educationDescription, setEducationDescription] = useState("");
+  const [educationPrograms, setEducationPrograms] = useState<string[]>([]);
+  const [educationProgramsOther, setEducationProgramsOther] = useState("");
+  const [educationAxes, setEducationAxes] = useState<string[]>([]);
+  const [educationAxesOther, setEducationAxesOther] = useState("");
+  const [educationEquipments, setEducationEquipments] = useState<string[]>([]);
+  const [educationEquipmentsOther, setEducationEquipmentsOther] = useState("");
+  const [educationServices, setEducationServices] = useState<string[]>([]);
+  const [educationServicesOther, setEducationServicesOther] = useState("");
+  const [educationFnb, setEducationFnb] = useState<string[]>([]);
+  const [educationContractModels, setEducationContractModels] = useState<string[]>([]);
+  const [educationContractModelsOther, setEducationContractModelsOther] = useState("");
+  const [educationPartners, setEducationPartners] = useState("");
+  const [educationAccreditations, setEducationAccreditations] = useState("");
+  const [educationBusinessModels, setEducationBusinessModels] = useState<string[]>([]);
+
+  const [artCultureSubtype, setArtCultureSubtype] = useState("");
+  const [artCultureCreationDate, setArtCultureCreationDate] = useState("");
+  const [artCultureRenovationDate, setArtCultureRenovationDate] = useState("");
+  const [artCultureOperator, setArtCultureOperator] = useState("");
+  const [artCultureFloors, setArtCultureFloors] = useState("");
+  const [artCultureCapacity, setArtCultureCapacity] = useState("");
+  const [artCulturePositioning, setArtCulturePositioning] = useState("");
+  const [artCultureTargets, setArtCultureTargets] = useState<string[]>([]);
+  const [artCultureTargetsOther, setArtCultureTargetsOther] = useState("");
+  const [artCultureDescription, setArtCultureDescription] = useState("");
+  const [artCultureActivities, setArtCultureActivities] = useState<string[]>([]);
+  const [artCultureActivitiesOther, setArtCultureActivitiesOther] = useState("");
+  const [artCultureEquipments, setArtCultureEquipments] = useState<string[]>([]);
+  const [artCultureEquipmentsOther, setArtCultureEquipmentsOther] = useState("");
+  const [artCultureServices, setArtCultureServices] = useState<string[]>([]);
+  const [artCultureServicesOther, setArtCultureServicesOther] = useState("");
+  const [artCultureFnb, setArtCultureFnb] = useState<string[]>([]);
+  const [artCultureFnbOther, setArtCultureFnbOther] = useState("");
+  const [artCultureSpaces, setArtCultureSpaces] = useState<SpaceCapacityItem[]>([]);
+  const [artCultureSpaceInput, setArtCultureSpaceInput] = useState<SpaceCapacityItem>({ name: "", capacity: "", surface: "" });
+  const [editingArtCultureSpaceIndex, setEditingArtCultureSpaceIndex] = useState<number | null>(null);
+  const [artCultureHighlights, setArtCultureHighlights] = useState("");
+  const [artCultureManagementModels, setArtCultureManagementModels] = useState<string[]>([]);
+  const [artCultureManagementModelsOther, setArtCultureManagementModelsOther] = useState("");
+  const [artCultureBusinessModels, setArtCultureBusinessModels] = useState<string[]>([]);
+  const [artCulturePartners, setArtCulturePartners] = useState<string[]>([]);
+  const [artCulturePartnersOther, setArtCulturePartnersOther] = useState("");
+  const [artCultureLabels, setArtCultureLabels] = useState<string[]>([]);
+  const [artCultureLabelsOther, setArtCultureLabelsOther] = useState("");
+
+  const [leisureSubtype, setLeisureSubtype] = useState("");
+  const [leisureBuiltSurface, setLeisureBuiltSurface] = useState("");
+  const [leisureCreationDate, setLeisureCreationDate] = useState("");
+  const [leisureRenovationDate, setLeisureRenovationDate] = useState("");
+  const [leisureFloors, setLeisureFloors] = useState("");
+  const [leisureCapacity, setLeisureCapacity] = useState("");
+  const [leisureAnnualVisitors, setLeisureAnnualVisitors] = useState("");
+  const [leisurePositioning, setLeisurePositioning] = useState("");
+  const [leisureTargets, setLeisureTargets] = useState<string[]>([]);
+  const [leisureDescription, setLeisureDescription] = useState("");
+  const [leisureActivities, setLeisureActivities] = useState<string[]>([]);
+  const [leisureActivitiesOther, setLeisureActivitiesOther] = useState("");
+  const [leisureEquipments, setLeisureEquipments] = useState<string[]>([]);
+  const [leisureEquipmentsOther, setLeisureEquipmentsOther] = useState("");
+  const [leisureServices, setLeisureServices] = useState<string[]>([]);
+  const [leisureServicesOther, setLeisureServicesOther] = useState("");
+  const [leisureFnb, setLeisureFnb] = useState<string[]>([]);
+  const [leisureSpaces, setLeisureSpaces] = useState<SpaceCapacityItem[]>([]);
+  const [leisureSpaceInput, setLeisureSpaceInput] = useState<SpaceCapacityItem>({ name: "", capacity: "", surface: "" });
+  const [editingLeisureSpaceIndex, setEditingLeisureSpaceIndex] = useState<number | null>(null);
+  const [leisureHighlights, setLeisureHighlights] = useState("");
+  const [leisureSeasonality, setLeisureSeasonality] = useState<string[]>([]);
+  const [leisureManagementModels, setLeisureManagementModels] = useState<string[]>([]);
+  const [leisureManagementModelsOther, setLeisureManagementModelsOther] = useState("");
+  const [leisureBusinessModels, setLeisureBusinessModels] = useState<string[]>([]);
+  const [leisurePartners, setLeisurePartners] = useState("");
+  const [leisureLabels, setLeisureLabels] = useState("");
+  const [leisurePricingAdult, setLeisurePricingAdult] = useState("");
+  const [leisurePricingChild, setLeisurePricingChild] = useState("");
+  const [leisurePricingFamily, setLeisurePricingFamily] = useState("");
+  const [leisurePricingAnnualPass, setLeisurePricingAnnualPass] = useState("");
+  const [leisurePricingGroup, setLeisurePricingGroup] = useState("");
+  const [leisurePricingCorporate, setLeisurePricingCorporate] = useState("");
+  const [leisurePricingPerActivity, setLeisurePricingPerActivity] = useState("");
+
   // --- Map ---
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -905,6 +1404,124 @@ export default function AddProjectScreen() {
       setHotelLeisure([]);
       setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "" });
       setEditingHotelLeisureIndex(null);
+
+      setSportSubtype("");
+      setSportCreationDate("");
+      setSportRenovationDate("");
+      setSportFloors("");
+      setSportCapacity("");
+      setSportPositioning("");
+      setSportTargets([]);
+      setSportDescription("");
+      setSportActivities([]);
+      setSportActivitiesOther("");
+      setSportEquipments([]);
+      setSportEquipmentsOther("");
+      setSportServices([]);
+      setSportServicesOther("");
+      setSportFnb([]);
+      setSportFnbOther("");
+      setSportPricingMembershipFee("");
+      setSportPricingMonthly("");
+      setSportPricingAnnual("");
+      setSportPricingDaily("");
+      setSportPricingPerActivity("");
+      setSportCurrentMembers("");
+      setSportRenewalRate("");
+      setSportLabels("");
+      setSportBusinessModels([]);
+
+      setEducationSubtype("");
+      setEducationCreationDate("");
+      setEducationRenovationDate("");
+      setEducationFloors("");
+      setEducationCapacity("");
+      setEducationStudents("");
+      setEducationIntlStudents("");
+      setEducationTeachers("");
+      setEducationPositioning("");
+      setEducationTargets([]);
+      setEducationTargetsOther("");
+      setEducationDescription("");
+      setEducationPrograms([]);
+      setEducationProgramsOther("");
+      setEducationAxes([]);
+      setEducationAxesOther("");
+      setEducationEquipments([]);
+      setEducationEquipmentsOther("");
+      setEducationServices([]);
+      setEducationServicesOther("");
+      setEducationFnb([]);
+      setEducationContractModels([]);
+      setEducationContractModelsOther("");
+      setEducationPartners("");
+      setEducationAccreditations("");
+      setEducationBusinessModels([]);
+
+      setArtCultureSubtype("");
+      setArtCultureCreationDate("");
+      setArtCultureRenovationDate("");
+      setArtCultureOperator("");
+      setArtCultureFloors("");
+      setArtCultureCapacity("");
+      setArtCulturePositioning("");
+      setArtCultureTargets([]);
+      setArtCultureTargetsOther("");
+      setArtCultureDescription("");
+      setArtCultureActivities([]);
+      setArtCultureActivitiesOther("");
+      setArtCultureEquipments([]);
+      setArtCultureEquipmentsOther("");
+      setArtCultureServices([]);
+      setArtCultureServicesOther("");
+      setArtCultureFnb([]);
+      setArtCultureFnbOther("");
+      setArtCultureSpaces([]);
+      setArtCultureSpaceInput({ name: "", capacity: "", surface: "" });
+      setEditingArtCultureSpaceIndex(null);
+      setArtCultureHighlights("");
+      setArtCultureManagementModels([]);
+      setArtCultureManagementModelsOther("");
+      setArtCultureBusinessModels([]);
+      setArtCulturePartners([]);
+      setArtCulturePartnersOther("");
+      setArtCultureLabels([]);
+      setArtCultureLabelsOther("");
+
+      setLeisureSubtype("");
+      setLeisureBuiltSurface("");
+      setLeisureCreationDate("");
+      setLeisureRenovationDate("");
+      setLeisureFloors("");
+      setLeisureCapacity("");
+      setLeisureAnnualVisitors("");
+      setLeisurePositioning("");
+      setLeisureTargets([]);
+      setLeisureDescription("");
+      setLeisureActivities([]);
+      setLeisureActivitiesOther("");
+      setLeisureEquipments([]);
+      setLeisureEquipmentsOther("");
+      setLeisureServices([]);
+      setLeisureServicesOther("");
+      setLeisureFnb([]);
+      setLeisureSpaces([]);
+      setLeisureSpaceInput({ name: "", capacity: "", surface: "" });
+      setEditingLeisureSpaceIndex(null);
+      setLeisureHighlights("");
+      setLeisureSeasonality([]);
+      setLeisureManagementModels([]);
+      setLeisureManagementModelsOther("");
+      setLeisureBusinessModels([]);
+      setLeisurePartners("");
+      setLeisureLabels("");
+      setLeisurePricingAdult("");
+      setLeisurePricingChild("");
+      setLeisurePricingFamily("");
+      setLeisurePricingAnnualPass("");
+      setLeisurePricingGroup("");
+      setLeisurePricingCorporate("");
+      setLeisurePricingPerActivity("");
       
       // Map
       setLatitude(null);
@@ -943,6 +1560,10 @@ export default function AddProjectScreen() {
     if (projectType === "Bureau") return ["Bureau"];
     if (projectType === "Santé") return ["Santé"];
     if (projectType === "Hotel") return ["Hotel"];
+    if (projectType === "Sport") return ["Sport"];
+    if (projectType === "Education") return ["Education"];
+    if (projectType === "Art et culture") return ["Art et culture"];
+    if (projectType === "Loisir") return ["Loisir"];
     if (projectType === "Collectif/Villa") return ["Collectif", "Villa"];
     if (projectType === "Collectif/Lot de villas") return ["Collectif", "Lot de villas"];
     if (projectType === "Villa/Lot de villas") return ["Villa", "Lot de villas"];
@@ -952,7 +1573,7 @@ export default function AddProjectScreen() {
 
   const isResidentialProject = ["Collectif", "Villa", "Lot de villas"].includes(projectType) || projectType.includes("/");
   const showCommercialMetrics = isResidentialProject || projectType === "Retail";
-  const hideCommercialFields = ["Bureau", "Santé", "Hotel"].includes(projectType);
+  const hideCommercialFields = ["Bureau", "Santé", "Hotel", "Sport", "Education", "Art et culture", "Loisir"].includes(projectType);
 
   // Fonction pour obtenir les typologies disponibles
   const getTypologiesForCategory = (category: string): string[] => {
@@ -1107,6 +1728,22 @@ export default function AddProjectScreen() {
     setHotelLeisure(next);
     setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "" });
     setEditingHotelLeisureIndex(null);
+  };
+
+  const addOrUpdateArtCultureSpace = () => {
+    if (!artCultureSpaceInput.name.trim()) return;
+    const next = upsertListItem(artCultureSpaces, artCultureSpaceInput, editingArtCultureSpaceIndex);
+    setArtCultureSpaces(next);
+    setArtCultureSpaceInput({ name: "", capacity: "", surface: "" });
+    setEditingArtCultureSpaceIndex(null);
+  };
+
+  const addOrUpdateLeisureSpace = () => {
+    if (!leisureSpaceInput.name.trim()) return;
+    const next = upsertListItem(leisureSpaces, leisureSpaceInput, editingLeisureSpaceIndex);
+    setLeisureSpaces(next);
+    setLeisureSpaceInput({ name: "", capacity: "", surface: "" });
+    setEditingLeisureSpaceIndex(null);
   };
 
   const loadProjectForEdit = async (id: string) => {
@@ -1268,6 +1905,10 @@ export default function AddProjectScreen() {
         const office = details.office || {};
         const health = details.health || {};
         const hotel = details.hotel || {};
+        const sport = details.sport || {};
+        const education = details.education || {};
+        const artCulture = details.artCulture || {};
+        const leisure = details.leisure || {};
 
         setRetailTypology(retail.typology || "");
         setRetailNiveaux(retail.niveaux || "");
@@ -1336,6 +1977,120 @@ export default function AddProjectScreen() {
         setHotelLeisure(Array.isArray(hotel.leisure) ? hotel.leisure : []);
         setOpeningDate(hotel.openingDate || "");
         setOpeningDateObj(hotel.openingDate ? new Date(hotel.openingDate) : null);
+
+        setSportSubtype(sport.subtype || "");
+        setSportCreationDate(sport.creationDate || "");
+        setSportRenovationDate(sport.renovationDate || "");
+        setSportFloors(sport.floors || "");
+        setSportCapacity(sport.capacity || "");
+        setSportPositioning(sport.positioning || "");
+        setSportTargets(Array.isArray(sport.targets) ? sport.targets : []);
+        setSportDescription(sport.description || "");
+        setSportActivities(Array.isArray(sport.activities) ? sport.activities : []);
+        setSportActivitiesOther(sport.activitiesOther || "");
+        setSportEquipments(Array.isArray(sport.equipments) ? sport.equipments : []);
+        setSportEquipmentsOther(sport.equipmentsOther || "");
+        setSportServices(Array.isArray(sport.services) ? sport.services : []);
+        setSportServicesOther(sport.servicesOther || "");
+        setSportFnb(Array.isArray(sport.fnb) ? sport.fnb : []);
+        setSportFnbOther(sport.fnbOther || "");
+        setSportPricingMembershipFee(sport.pricingMembershipFee || "");
+        setSportPricingMonthly(sport.pricingMonthly || "");
+        setSportPricingAnnual(sport.pricingAnnual || "");
+        setSportPricingDaily(sport.pricingDaily || "");
+        setSportPricingPerActivity(sport.pricingPerActivity || "");
+        setSportCurrentMembers(sport.currentMembers || "");
+        setSportRenewalRate(sport.renewalRate || "");
+        setSportLabels(sport.labels || "");
+        setSportBusinessModels(Array.isArray(sport.businessModels) ? sport.businessModels : []);
+
+        setEducationSubtype(education.subtype || "");
+        setEducationCreationDate(education.creationDate || "");
+        setEducationRenovationDate(education.renovationDate || "");
+        setEducationFloors(education.floors || "");
+        setEducationCapacity(education.capacity || "");
+        setEducationStudents(education.students || "");
+        setEducationIntlStudents(education.internationalStudents || "");
+        setEducationTeachers(education.teachers || "");
+        setEducationPositioning(education.positioning || "");
+        setEducationTargets(Array.isArray(education.targets) ? education.targets : []);
+        setEducationTargetsOther(education.targetsOther || "");
+        setEducationDescription(education.description || "");
+        setEducationPrograms(Array.isArray(education.programs) ? education.programs : []);
+        setEducationProgramsOther(education.programsOther || "");
+        setEducationAxes(Array.isArray(education.axes) ? education.axes : []);
+        setEducationAxesOther(education.axesOther || "");
+        setEducationEquipments(Array.isArray(education.equipments) ? education.equipments : []);
+        setEducationEquipmentsOther(education.equipmentsOther || "");
+        setEducationServices(Array.isArray(education.services) ? education.services : []);
+        setEducationServicesOther(education.servicesOther || "");
+        setEducationFnb(Array.isArray(education.fnb) ? education.fnb : []);
+        setEducationContractModels(Array.isArray(education.contractModels) ? education.contractModels : []);
+        setEducationContractModelsOther(education.contractModelsOther || "");
+        setEducationPartners(education.partners || "");
+        setEducationAccreditations(education.accreditations || "");
+        setEducationBusinessModels(Array.isArray(education.businessModels) ? education.businessModels : []);
+
+        setArtCultureSubtype(artCulture.subtype || "");
+        setArtCultureCreationDate(artCulture.creationDate || "");
+        setArtCultureRenovationDate(artCulture.renovationDate || "");
+        setArtCultureOperator(artCulture.operator || "");
+        setArtCultureFloors(artCulture.floors || "");
+        setArtCultureCapacity(artCulture.capacity || "");
+        setArtCulturePositioning(artCulture.positioning || "");
+        setArtCultureTargets(Array.isArray(artCulture.targets) ? artCulture.targets : []);
+        setArtCultureTargetsOther(artCulture.targetsOther || "");
+        setArtCultureDescription(artCulture.description || "");
+        setArtCultureActivities(Array.isArray(artCulture.activities) ? artCulture.activities : []);
+        setArtCultureActivitiesOther(artCulture.activitiesOther || "");
+        setArtCultureEquipments(Array.isArray(artCulture.equipments) ? artCulture.equipments : []);
+        setArtCultureEquipmentsOther(artCulture.equipmentsOther || "");
+        setArtCultureServices(Array.isArray(artCulture.services) ? artCulture.services : []);
+        setArtCultureServicesOther(artCulture.servicesOther || "");
+        setArtCultureFnb(Array.isArray(artCulture.fnb) ? artCulture.fnb : []);
+        setArtCultureFnbOther(artCulture.fnbOther || "");
+        setArtCultureSpaces(Array.isArray(artCulture.spaceCapacities) ? artCulture.spaceCapacities : []);
+        setArtCultureHighlights(artCulture.highlights || "");
+        setArtCultureManagementModels(Array.isArray(artCulture.managementModels) ? artCulture.managementModels : []);
+        setArtCultureManagementModelsOther(artCulture.managementModelsOther || "");
+        setArtCultureBusinessModels(Array.isArray(artCulture.businessModels) ? artCulture.businessModels : []);
+        setArtCulturePartners(Array.isArray(artCulture.partners) ? artCulture.partners : []);
+        setArtCulturePartnersOther(artCulture.partnersOther || "");
+        setArtCultureLabels(Array.isArray(artCulture.labels) ? artCulture.labels : []);
+        setArtCultureLabelsOther(artCulture.labelsOther || "");
+
+        setLeisureSubtype(leisure.subtype || "");
+        setLeisureBuiltSurface(leisure.builtSurface || "");
+        setLeisureCreationDate(leisure.creationDate || "");
+        setLeisureRenovationDate(leisure.renovationDate || "");
+        setLeisureFloors(leisure.floors || "");
+        setLeisureCapacity(leisure.capacity || "");
+        setLeisureAnnualVisitors(leisure.annualVisitors || "");
+        setLeisurePositioning(leisure.positioning || "");
+        setLeisureTargets(Array.isArray(leisure.targets) ? leisure.targets : []);
+        setLeisureDescription(leisure.description || "");
+        setLeisureActivities(Array.isArray(leisure.activities) ? leisure.activities : []);
+        setLeisureActivitiesOther(leisure.activitiesOther || "");
+        setLeisureEquipments(Array.isArray(leisure.equipments) ? leisure.equipments : []);
+        setLeisureEquipmentsOther(leisure.equipmentsOther || "");
+        setLeisureServices(Array.isArray(leisure.services) ? leisure.services : []);
+        setLeisureServicesOther(leisure.servicesOther || "");
+        setLeisureFnb(Array.isArray(leisure.fnb) ? leisure.fnb : []);
+        setLeisureSpaces(Array.isArray(leisure.spaceCapacities) ? leisure.spaceCapacities : []);
+        setLeisureHighlights(leisure.highlights || "");
+        setLeisureSeasonality(Array.isArray(leisure.seasonality) ? leisure.seasonality : []);
+        setLeisureManagementModels(Array.isArray(leisure.managementModels) ? leisure.managementModels : []);
+        setLeisureManagementModelsOther(leisure.managementModelsOther || "");
+        setLeisureBusinessModels(Array.isArray(leisure.businessModels) ? leisure.businessModels : []);
+        setLeisurePartners(leisure.partners || "");
+        setLeisureLabels(leisure.labels || "");
+        setLeisurePricingAdult(leisure.pricingAdult || "");
+        setLeisurePricingChild(leisure.pricingChild || "");
+        setLeisurePricingFamily(leisure.pricingFamily || "");
+        setLeisurePricingAnnualPass(leisure.pricingAnnualPass || "");
+        setLeisurePricingGroup(leisure.pricingGroup || "");
+        setLeisurePricingCorporate(leisure.pricingCorporate || "");
+        setLeisurePricingPerActivity(leisure.pricingPerActivity || "");
       }
     } catch (error) {
       console.error(error);
@@ -1962,6 +2717,124 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
         leisure: hotelLeisure,
         openingDate,
       },
+      sport: {
+        subtype: sportSubtype,
+        creationDate: sportCreationDate,
+        renovationDate: sportRenovationDate,
+        floors: sportFloors,
+        capacity: sportCapacity,
+        positioning: sportPositioning,
+        targets: sportTargets,
+        description: sportDescription,
+        activities: sportActivities,
+        activitiesOther: sportActivitiesOther,
+        equipments: sportEquipments,
+        equipmentsOther: sportEquipmentsOther,
+        services: sportServices,
+        servicesOther: sportServicesOther,
+        fnb: sportFnb,
+        fnbOther: sportFnbOther,
+        pricingMembershipFee: sportPricingMembershipFee,
+        pricingMonthly: sportPricingMonthly,
+        pricingAnnual: sportPricingAnnual,
+        pricingDaily: sportPricingDaily,
+        pricingPerActivity: sportPricingPerActivity,
+        currentMembers: sportCurrentMembers,
+        renewalRate: sportRenewalRate,
+        labels: sportLabels,
+        businessModels: sportBusinessModels,
+      },
+      education: {
+        subtype: educationSubtype,
+        creationDate: educationCreationDate,
+        renovationDate: educationRenovationDate,
+        floors: educationFloors,
+        capacity: educationCapacity,
+        students: educationStudents,
+        internationalStudents: educationIntlStudents,
+        teachers: educationTeachers,
+        positioning: educationPositioning,
+        targets: educationTargets,
+        targetsOther: educationTargetsOther,
+        description: educationDescription,
+        programs: educationPrograms,
+        programsOther: educationProgramsOther,
+        axes: educationAxes,
+        axesOther: educationAxesOther,
+        equipments: educationEquipments,
+        equipmentsOther: educationEquipmentsOther,
+        services: educationServices,
+        servicesOther: educationServicesOther,
+        fnb: educationFnb,
+        contractModels: educationContractModels,
+        contractModelsOther: educationContractModelsOther,
+        partners: educationPartners,
+        accreditations: educationAccreditations,
+        businessModels: educationBusinessModels,
+      },
+      artCulture: {
+        subtype: artCultureSubtype,
+        creationDate: artCultureCreationDate,
+        renovationDate: artCultureRenovationDate,
+        operator: artCultureOperator,
+        floors: artCultureFloors,
+        capacity: artCultureCapacity,
+        positioning: artCulturePositioning,
+        targets: artCultureTargets,
+        targetsOther: artCultureTargetsOther,
+        description: artCultureDescription,
+        activities: artCultureActivities,
+        activitiesOther: artCultureActivitiesOther,
+        equipments: artCultureEquipments,
+        equipmentsOther: artCultureEquipmentsOther,
+        services: artCultureServices,
+        servicesOther: artCultureServicesOther,
+        fnb: artCultureFnb,
+        fnbOther: artCultureFnbOther,
+        spaceCapacities: artCultureSpaces,
+        highlights: artCultureHighlights,
+        managementModels: artCultureManagementModels,
+        managementModelsOther: artCultureManagementModelsOther,
+        businessModels: artCultureBusinessModels,
+        partners: artCulturePartners,
+        partnersOther: artCulturePartnersOther,
+        labels: artCultureLabels,
+        labelsOther: artCultureLabelsOther,
+      },
+      leisure: {
+        subtype: leisureSubtype,
+        builtSurface: leisureBuiltSurface,
+        creationDate: leisureCreationDate,
+        renovationDate: leisureRenovationDate,
+        floors: leisureFloors,
+        capacity: leisureCapacity,
+        annualVisitors: leisureAnnualVisitors,
+        positioning: leisurePositioning,
+        targets: leisureTargets,
+        description: leisureDescription,
+        activities: leisureActivities,
+        activitiesOther: leisureActivitiesOther,
+        equipments: leisureEquipments,
+        equipmentsOther: leisureEquipmentsOther,
+        services: leisureServices,
+        servicesOther: leisureServicesOther,
+        fnb: leisureFnb,
+        spaceCapacities: leisureSpaces,
+        highlights: leisureHighlights,
+        seasonality: leisureSeasonality,
+        managementModels: leisureManagementModels,
+        managementModelsOther: leisureManagementModelsOther,
+        businessModels: leisureBusinessModels,
+        partners: leisurePartners,
+        labels: leisureLabels,
+        pricingAdult: leisurePricingAdult,
+        pricingChild: leisurePricingChild,
+        pricingFamily: leisurePricingFamily,
+        pricingAnnualPass: leisurePricingAnnualPass,
+        pricingGroup: leisurePricingGroup,
+        pricingCorporate: leisurePricingCorporate,
+        pricingPerActivity: leisurePricingPerActivity,
+      },
     };
 
     const { error: detailsError } = await supabase
@@ -2351,6 +3224,19 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               {openingDate || "Date d'ouverture"}
             </Text>
           </TouchableOpacity>
+
+          {projectType === "Sport" && (
+            <TextInput placeholder="Date de rénovation" style={styles.input} value={sportRenovationDate} onChangeText={setSportRenovationDate} />
+          )}
+          {projectType === "Education" && (
+            <TextInput placeholder="Date de rénovation" style={styles.input} value={educationRenovationDate} onChangeText={setEducationRenovationDate} />
+          )}
+          {projectType === "Art et culture" && (
+            <TextInput placeholder="Date de rénovation" style={styles.input} value={artCultureRenovationDate} onChangeText={setArtCultureRenovationDate} />
+          )}
+          {projectType === "Loisir" && (
+            <TextInput placeholder="Date de rénovation" style={styles.input} value={leisureRenovationDate} onChangeText={setLeisureRenovationDate} />
+          )}
 
           {(showDeliveryDatePicker || showStartCommercialDatePicker || showOpeningDatePicker) && (
             <Modal transparent animationType="fade">
@@ -3251,6 +4137,457 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                   </View>
                 </View>
               ))}
+            </>
+          )}
+
+          {projectType === "Sport" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Sport</ThemedText>
+              <TextInput placeholder="Sous-type" style={styles.input} value={sportSubtype} onChangeText={setSportSubtype} />
+              <Text style={styles.fieldLabel}>Sous-type (sélection rapide)</Text>
+              <View style={styles.chipsRow}>
+                {sportSubtypeOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportSubtype === option && styles.optionChipActive]} onPress={() => setSportSubtype(option)}>
+                    <Text style={[styles.optionChipText, sportSubtype === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Description" style={styles.input} value={sportDescription} onChangeText={setSportDescription} multiline />
+              <TextInput placeholder="Capacité" style={styles.input} value={withSuffix(sportCapacity, "personnes")} onChangeText={(text) => setSportCapacity(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Positionnement" style={styles.input} value={sportPositioning} onChangeText={setSportPositioning} multiline />
+              <ThemedText style={styles.subSectionTitle}>Clientèle cible</ThemedText>
+              <View style={styles.chipsRow}>
+                {sportTargetOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportTargets.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, sportTargets, setSportTargets)}>
+                    <Text style={[styles.optionChipText, sportTargets.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.subSectionTitle}>Activités sportives</ThemedText>
+              <View style={styles.chipsRow}>
+                {sportActivityOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportActivities.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, sportActivities, setSportActivities)}>
+                    <Text style={[styles.optionChipText, sportActivities.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(sportActivities) && (
+                <TextInput placeholder="Autre activité sportive" style={styles.input} value={sportActivitiesOther} onChangeText={setSportActivitiesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Équipements</ThemedText>
+              <View style={styles.chipsRow}>
+                {sportEquipmentOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportEquipments.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, sportEquipments, setSportEquipments)}>
+                    <Text style={[styles.optionChipText, sportEquipments.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(sportEquipments) && (
+                <TextInput placeholder="Autre équipement" style={styles.input} value={sportEquipmentsOther} onChangeText={setSportEquipmentsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Services</ThemedText>
+              <View style={styles.chipsRow}>
+                {sportServiceOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportServices.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, sportServices, setSportServices)}>
+                    <Text style={[styles.optionChipText, sportServices.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(sportServices) && (
+                <TextInput placeholder="Autre service" style={styles.input} value={sportServicesOther} onChangeText={setSportServicesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>F&B</ThemedText>
+              <View style={styles.chipsRow}>
+                {[...commonFnbOptions, "Autre"].map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportFnb.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, sportFnb, setSportFnb)}>
+                    <Text style={[styles.optionChipText, sportFnb.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(sportFnb) && (
+                <TextInput placeholder="Autre F&B" style={styles.input} value={sportFnbOther} onChangeText={setSportFnbOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Tarification</ThemedText>
+              <TextInput placeholder="Frais d'adhésion" style={styles.input} value={withSuffix(sportPricingMembershipFee, "MAD")} onChangeText={(text) => setSportPricingMembershipFee(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Cotisation mensuelle" style={styles.input} value={withSuffix(sportPricingMonthly, "MAD")} onChangeText={(text) => setSportPricingMonthly(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Cotisation annuelle" style={styles.input} value={withSuffix(sportPricingAnnual, "MAD")} onChangeText={(text) => setSportPricingAnnual(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Tarif journalier" style={styles.input} value={withSuffix(sportPricingDaily, "MAD")} onChangeText={(text) => setSportPricingDaily(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Tarif par activité" style={styles.input} value={withSuffix(sportPricingPerActivity, "MAD")} onChangeText={(text) => setSportPricingPerActivity(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <ThemedText style={styles.subSectionTitle}>Nombre de membres actuels</ThemedText>
+              <TextInput placeholder="Nombre de membres actuels" style={styles.input} value={withSuffix(sportCurrentMembers, "membres")} onChangeText={(text) => setSportCurrentMembers(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <ThemedText style={styles.subSectionTitle}>Taux de renouvellement</ThemedText>
+              <TextInput placeholder="Taux de renouvellement" style={styles.input} value={sportRenewalRate ? `${sportRenewalRate}%` : ""} onChangeText={(text) => setSportRenewalRate(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <ThemedText style={styles.subSectionTitle}>Labels / Certifications</ThemedText>
+              <TextInput placeholder="Labels / Certifications" style={styles.input} value={sportLabels} onChangeText={setSportLabels} />
+              <ThemedText style={styles.subSectionTitle}>Business model</ThemedText>
+              <View style={styles.chipsRow}>
+                {sportBusinessModelOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, sportBusinessModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, sportBusinessModels, setSportBusinessModels)}>
+                    <Text style={[styles.optionChipText, sportBusinessModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          {projectType === "Education" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Education</ThemedText>
+              <TextInput placeholder="Sous-type" style={styles.input} value={educationSubtype} onChangeText={setEducationSubtype} />
+              <Text style={styles.fieldLabel}>Sous-type (sélection rapide)</Text>
+              <View style={styles.chipsRow}>
+                {educationSubtypeOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationSubtype === option && styles.optionChipActive]} onPress={() => setEducationSubtype(option)}>
+                    <Text style={[styles.optionChipText, educationSubtype === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Description" style={styles.input} value={educationDescription} onChangeText={setEducationDescription} multiline />
+              <TextInput placeholder="Capacité d'accueil" style={styles.input} value={withSuffix(educationCapacity, "étudiants")} onChangeText={(text) => setEducationCapacity(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Nombre d'étudiants" style={styles.input} value={withSuffix(educationStudents, "étudiants")} onChangeText={(text) => setEducationStudents(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Étudiants internationaux" style={styles.input} value={withSuffix(educationIntlStudents, "étudiants")} onChangeText={(text) => setEducationIntlStudents(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Nombre d'enseignants" style={styles.input} value={withSuffix(educationTeachers, "enseignants")} onChangeText={(text) => setEducationTeachers(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Positionnement" style={styles.input} value={educationPositioning} onChangeText={setEducationPositioning} multiline />
+              <ThemedText style={styles.subSectionTitle}>Public cible</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationPublicTargetOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationTargets.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationTargets, setEducationTargets)}>
+                    <Text style={[styles.optionChipText, educationTargets.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(educationTargets) && (
+                <TextInput placeholder="Autre public cible" style={styles.input} value={educationTargetsOther} onChangeText={setEducationTargetsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Programmes proposés</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationProgramsOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationPrograms.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationPrograms, setEducationPrograms)}>
+                    <Text style={[styles.optionChipText, educationPrograms.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(educationPrograms) && (
+                <TextInput placeholder="Autre programme" style={styles.input} value={educationProgramsOther} onChangeText={setEducationProgramsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Axes académiques / filières</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationAxesOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationAxes.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationAxes, setEducationAxes)}>
+                    <Text style={[styles.optionChipText, educationAxes.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(educationAxes) && (
+                <TextInput placeholder="Autre axe académique / filière" style={styles.input} value={educationAxesOther} onChangeText={setEducationAxesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Équipements</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationEquipmentOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationEquipments.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationEquipments, setEducationEquipments)}>
+                    <Text style={[styles.optionChipText, educationEquipments.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(educationEquipments) && (
+                <TextInput placeholder="Autre équipement" style={styles.input} value={educationEquipmentsOther} onChangeText={setEducationEquipmentsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Services</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationServicesOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationServices.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationServices, setEducationServices)}>
+                    <Text style={[styles.optionChipText, educationServices.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(educationServices) && (
+                <TextInput placeholder="Autre service" style={styles.input} value={educationServicesOther} onChangeText={setEducationServicesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>F&B</ThemedText>
+              <View style={styles.chipsRow}>
+                {commonFnbOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationFnb.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationFnb, setEducationFnb)}>
+                    <Text style={[styles.optionChipText, educationFnb.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.subSectionTitle}>Modèle contractuel</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationContractOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationContractModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationContractModels, setEducationContractModels)}>
+                    <Text style={[styles.optionChipText, educationContractModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(educationContractModels) && (
+                <TextInput placeholder="Autre modèle contractuel" style={styles.input} value={educationContractModelsOther} onChangeText={setEducationContractModelsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Partenaires académiques</ThemedText>
+              <TextInput placeholder="Partenaires académiques" style={styles.input} value={educationPartners} onChangeText={setEducationPartners} multiline />
+              <ThemedText style={styles.subSectionTitle}>Accréditations / certifications</ThemedText>
+              <TextInput placeholder="Accréditations / certifications" style={styles.input} value={educationAccreditations} onChangeText={setEducationAccreditations} multiline />
+              <ThemedText style={styles.subSectionTitle}>Business model</ThemedText>
+              <View style={styles.chipsRow}>
+                {educationBusinessModelOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, educationBusinessModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, educationBusinessModels, setEducationBusinessModels)}>
+                    <Text style={[styles.optionChipText, educationBusinessModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          {projectType === "Art et culture" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Art et culture</ThemedText>
+              <TextInput placeholder="Sous-type" style={styles.input} value={artCultureSubtype} onChangeText={setArtCultureSubtype} />
+              <Text style={styles.fieldLabel}>Sous-type (sélection)</Text>
+              <View style={styles.chipsRow}>
+                {artCultureSubtypeOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureSubtype === option && styles.optionChipActive]} onPress={() => setArtCultureSubtype(option)}>
+                    <Text style={[styles.optionChipText, artCultureSubtype === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Description" style={styles.input} value={artCultureDescription} onChangeText={setArtCultureDescription} multiline />
+              <TextInput placeholder="Capacité" style={styles.input} value={withSuffix(artCultureCapacity, "places")} onChangeText={(text) => setArtCultureCapacity(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Positionnement" style={styles.input} value={artCulturePositioning} onChangeText={setArtCulturePositioning} multiline />
+              <ThemedText style={styles.subSectionTitle}>Public cible</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCulturePublicTargetOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureTargets.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureTargets, setArtCultureTargets)}>
+                    <Text style={[styles.optionChipText, artCultureTargets.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureTargets) && (
+                <TextInput placeholder="Autre public cible" style={styles.input} value={artCultureTargetsOther} onChangeText={setArtCultureTargetsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Activités / Programmation</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCultureActivitiesOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureActivities.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureActivities, setArtCultureActivities)}>
+                    <Text style={[styles.optionChipText, artCultureActivities.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureActivities) && (
+                <TextInput placeholder="Autre activité / programmation" style={styles.input} value={artCultureActivitiesOther} onChangeText={setArtCultureActivitiesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Espaces / Équipements</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCultureEquipmentOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureEquipments.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureEquipments, setArtCultureEquipments)}>
+                    <Text style={[styles.optionChipText, artCultureEquipments.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureEquipments) && (
+                <TextInput placeholder="Autre espace / équipement" style={styles.input} value={artCultureEquipmentsOther} onChangeText={setArtCultureEquipmentsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Services</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCultureServicesOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureServices.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureServices, setArtCultureServices)}>
+                    <Text style={[styles.optionChipText, artCultureServices.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureServices) && (
+                <TextInput placeholder="Autre service" style={styles.input} value={artCultureServicesOther} onChangeText={setArtCultureServicesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>F&B</ThemedText>
+              <View style={styles.chipsRow}>
+                {[...commonFnbOptions, "Autre"].map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureFnb.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureFnb, setArtCultureFnb)}>
+                    <Text style={[styles.optionChipText, artCultureFnb.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureFnb) && (
+                <TextInput placeholder="Autre F&B" style={styles.input} value={artCultureFnbOther} onChangeText={setArtCultureFnbOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Capacité des espaces</ThemedText>
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Nom de l'espace" style={[styles.input, styles.inlineInput]} value={artCultureSpaceInput.name} onChangeText={(text) => setArtCultureSpaceInput((previous) => ({ ...previous, name: text }))} />
+                <TextInput placeholder="Capacité" style={[styles.input, styles.inlineInput]} value={withSuffix(artCultureSpaceInput.capacity, "places")} onChangeText={(text) => setArtCultureSpaceInput((previous) => ({ ...previous, capacity: cleanupPercentValue(text) }))} keyboardType="decimal-pad" />
+              </View>
+              <TextInput placeholder="Surface" style={styles.input} value={withSuffix(artCultureSpaceInput.surface, "m²")} onChangeText={(text) => setArtCultureSpaceInput((previous) => ({ ...previous, surface: cleanupPercentValue(text) }))} keyboardType="decimal-pad" />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateArtCultureSpace}><Text style={styles.inlineAddButtonText}>{editingArtCultureSpaceIndex === null ? "Ajouter espace" : "Modifier espace"}</Text></TouchableOpacity>
+              {artCultureSpaces.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.capacity} places - {item.surface} m²</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setArtCultureSpaceInput(item); setEditingArtCultureSpaceIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setArtCultureSpaces((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              <TextInput placeholder="Caractéristiques uniques / points forts" style={styles.input} value={artCultureHighlights} onChangeText={setArtCultureHighlights} multiline />
+              <ThemedText style={styles.subSectionTitle}>Modèle de gestion</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCultureManagementOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureManagementModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureManagementModels, setArtCultureManagementModels)}>
+                    <Text style={[styles.optionChipText, artCultureManagementModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureManagementModels) && (
+                <TextInput placeholder="Autre modèle de gestion" style={styles.input} value={artCultureManagementModelsOther} onChangeText={setArtCultureManagementModelsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Business model</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCultureBusinessModelOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureBusinessModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureBusinessModels, setArtCultureBusinessModels)}>
+                    <Text style={[styles.optionChipText, artCultureBusinessModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.subSectionTitle}>Partenaires / institutions</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCulturePartnerOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCulturePartners.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCulturePartners, setArtCulturePartners)}>
+                    <Text style={[styles.optionChipText, artCulturePartners.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCulturePartners) && (
+                <TextInput placeholder="Autre partenaire / institution" style={styles.input} value={artCulturePartnersOther} onChangeText={setArtCulturePartnersOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Labels / Certifications</ThemedText>
+              <View style={styles.chipsRow}>
+                {artCultureLabelsOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, artCultureLabels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, artCultureLabels, setArtCultureLabels)}>
+                    <Text style={[styles.optionChipText, artCultureLabels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(artCultureLabels) && (
+                <TextInput placeholder="Autre label / certification" style={styles.input} value={artCultureLabelsOther} onChangeText={setArtCultureLabelsOther} />
+              )}
+            </>
+          )}
+
+          {projectType === "Loisir" && (
+            <>
+              <ThemedText style={styles.sectionTitle}>Loisir</ThemedText>
+              <TextInput placeholder="Sous-type" style={styles.input} value={leisureSubtype} onChangeText={setLeisureSubtype} />
+              <Text style={styles.fieldLabel}>Sous-type (sélection multiple)</Text>
+              <View style={styles.chipsRow}>
+                {leisureSubtypeOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureSubtype === option && styles.optionChipActive]} onPress={() => setLeisureSubtype(option)}>
+                    <Text style={[styles.optionChipText, leisureSubtype === option && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Description" style={styles.input} value={leisureDescription} onChangeText={setLeisureDescription} multiline />
+              <TextInput placeholder="Surface bâtie" style={styles.input} value={withSuffix(leisureBuiltSurface, "m²")} onChangeText={(text) => setLeisureBuiltSurface(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Capacité" style={styles.input} value={withSuffix(leisureCapacity, "visiteurs")} onChangeText={(text) => setLeisureCapacity(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Visiteurs annuels" style={styles.input} value={withSuffix(leisureAnnualVisitors, "visiteurs/an")} onChangeText={(text) => setLeisureAnnualVisitors(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Positionnement" style={styles.input} value={leisurePositioning} onChangeText={setLeisurePositioning} multiline />
+              <ThemedText style={styles.subSectionTitle}>Public cible</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisurePublicTargetOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureTargets.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureTargets, setLeisureTargets)}>
+                    <Text style={[styles.optionChipText, leisureTargets.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.subSectionTitle}>Activités / attractions</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisureActivitiesOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureActivities.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureActivities, setLeisureActivities)}>
+                    <Text style={[styles.optionChipText, leisureActivities.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(leisureActivities) && (
+                <TextInput placeholder="Autre activité / attraction" style={styles.input} value={leisureActivitiesOther} onChangeText={setLeisureActivitiesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Équipements</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisureEquipmentOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureEquipments.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureEquipments, setLeisureEquipments)}>
+                    <Text style={[styles.optionChipText, leisureEquipments.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(leisureEquipments) && (
+                <TextInput placeholder="Autre équipement" style={styles.input} value={leisureEquipmentsOther} onChangeText={setLeisureEquipmentsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Services</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisureServicesOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureServices.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureServices, setLeisureServices)}>
+                    <Text style={[styles.optionChipText, leisureServices.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(leisureServices) && (
+                <TextInput placeholder="Autre service" style={styles.input} value={leisureServicesOther} onChangeText={setLeisureServicesOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>F&B</ThemedText>
+              <View style={styles.chipsRow}>
+                {commonFnbOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureFnb.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureFnb, setLeisureFnb)}>
+                    <Text style={[styles.optionChipText, leisureFnb.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.subSectionTitle}>Capacité des espaces</ThemedText>
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Nom de l'espace" style={[styles.input, styles.inlineInput]} value={leisureSpaceInput.name} onChangeText={(text) => setLeisureSpaceInput((previous) => ({ ...previous, name: text }))} />
+                <TextInput placeholder="Capacité" style={[styles.input, styles.inlineInput]} value={withSuffix(leisureSpaceInput.capacity, "personnes")} onChangeText={(text) => setLeisureSpaceInput((previous) => ({ ...previous, capacity: cleanupPercentValue(text) }))} keyboardType="decimal-pad" />
+              </View>
+              <TextInput placeholder="Surface" style={styles.input} value={withSuffix(leisureSpaceInput.surface, "m²")} onChangeText={(text) => setLeisureSpaceInput((previous) => ({ ...previous, surface: cleanupPercentValue(text) }))} keyboardType="decimal-pad" />
+              <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateLeisureSpace}><Text style={styles.inlineAddButtonText}>{editingLeisureSpaceIndex === null ? "Ajouter espace" : "Modifier espace"}</Text></TouchableOpacity>
+              {leisureSpaces.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.capacity} personnes - {item.surface} m²</Text>
+                  <View style={styles.inlineActionsRow}>
+                    <TouchableOpacity onPress={() => { setLeisureSpaceInput(item); setEditingLeisureSpaceIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setLeisureSpaces((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+              <TextInput placeholder="Caractéristiques uniques / points forts" style={styles.input} value={leisureHighlights} onChangeText={setLeisureHighlights} multiline />
+              <ThemedText style={styles.subSectionTitle}>Tarification</ThemedText>
+              <TextInput placeholder="Ticket adulte" style={styles.input} value={withSuffix(leisurePricingAdult, "MAD")} onChangeText={(text) => setLeisurePricingAdult(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Ticket enfant" style={styles.input} value={withSuffix(leisurePricingChild, "MAD")} onChangeText={(text) => setLeisurePricingChild(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Tarif famille" style={styles.input} value={withSuffix(leisurePricingFamily, "MAD")} onChangeText={(text) => setLeisurePricingFamily(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Pass annuel" style={styles.input} value={withSuffix(leisurePricingAnnualPass, "MAD")} onChangeText={(text) => setLeisurePricingAnnualPass(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Tarif groupe" style={styles.input} value={withSuffix(leisurePricingGroup, "MAD")} onChangeText={(text) => setLeisurePricingGroup(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Tarif entreprise" style={styles.input} value={withSuffix(leisurePricingCorporate, "MAD")} onChangeText={(text) => setLeisurePricingCorporate(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <TextInput placeholder="Tarif par activité" style={styles.input} value={withSuffix(leisurePricingPerActivity, "MAD")} onChangeText={(text) => setLeisurePricingPerActivity(cleanupPercentValue(text))} keyboardType="decimal-pad" />
+              <ThemedText style={styles.subSectionTitle}>Saisonnalité</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisureSeasonalityOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureSeasonality.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureSeasonality, setLeisureSeasonality)}>
+                    <Text style={[styles.optionChipText, leisureSeasonality.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <ThemedText style={styles.subSectionTitle}>Modèle de gestion</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisureManagementOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureManagementModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureManagementModels, setLeisureManagementModels)}>
+                    <Text style={[styles.optionChipText, leisureManagementModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {hasOtherSelected(leisureManagementModels) && (
+                <TextInput placeholder="Autre modèle de gestion" style={styles.input} value={leisureManagementModelsOther} onChangeText={setLeisureManagementModelsOther} />
+              )}
+              <ThemedText style={styles.subSectionTitle}>Business model</ThemedText>
+              <View style={styles.chipsRow}>
+                {leisureBusinessModelOptions.map((option) => (
+                  <TouchableOpacity key={option} style={[styles.optionChip, leisureBusinessModels.includes(option) && styles.optionChipActive]} onPress={() => toggleSelection(option, leisureBusinessModels, setLeisureBusinessModels)}>
+                    <Text style={[styles.optionChipText, leisureBusinessModels.includes(option) && styles.optionChipTextActive]}>{option}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput placeholder="Partenaires / enseignes" style={styles.input} value={leisurePartners} onChangeText={setLeisurePartners} multiline />
+              <TextInput placeholder="Labels / Certifications" style={styles.input} value={leisureLabels} onChangeText={setLeisureLabels} multiline />
             </>
           )}
 

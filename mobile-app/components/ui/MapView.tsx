@@ -171,7 +171,7 @@ type MapViewProps = {
   mapType?: "standard" | "satellite" | "hybrid" | "terrain";
   markerSize?: number;
   markerColor?: string;
-  projectTypeColors?: Record<"Collectif" | "Villa" | "Lot de villas" | "Retail" | "Bureau" | "Santé" | "Hotel", string>;
+  projectTypeColors?: Record<"Collectif" | "Villa" | "Lot de villas" | "Retail" | "Bureau" | "Santé" | "Hotel" | "Loisir" | "Sport" | "Education" | "Art et culture", string>;
   markerBorderColor?: string;
   markerTextSize?: number;
 };
@@ -231,7 +231,7 @@ const splitProjectsIntoColumns = <T,>(items: T[]) => {
   return [items.slice(0, midpoint), items.slice(midpoint)];
 };
 
-const FILTER_TYPES = ["Collectif", "Villa", "Lot de villas", "Retail", "Bureau", "Santé", "Hotel"] as const;
+const FILTER_TYPES = ["Collectif", "Villa", "Lot de villas", "Retail", "Bureau", "Santé", "Hotel", "Loisir", "Sport", "Education", "Art et culture"] as const;
 type FilterType = (typeof FILTER_TYPES)[number];
 
 const PROJECT_TYPE_DEFAULT_COLORS: Record<FilterType, string> = {
@@ -242,6 +242,10 @@ const PROJECT_TYPE_DEFAULT_COLORS: Record<FilterType, string> = {
   Bureau: "#18424E",
   "Santé": "#009999",
   Hotel: "#7030A0",
+  Loisir: "#ff6b35",
+  Sport: "#1f77b4",
+  Education: "#2ca02c",
+  "Art et culture": "#e377c2",
 };
 
 const getProjectFilterTypes = (projectType: string | undefined): FilterType[] => {
@@ -270,6 +274,18 @@ const getProjectFilterTypes = (projectType: string | undefined): FilterType[] =>
   }
   if (normalized.includes("hotel") || normalized.includes("hôtel")) {
     types.push("Hotel");
+  }
+  if (normalized.includes("loisir")) {
+    types.push("Loisir");
+  }
+  if (normalized.includes("sport")) {
+    types.push("Sport");
+  }
+  if (normalized.includes("education") || normalized.includes("éducation")) {
+    types.push("Education");
+  }
+  if (normalized.includes("art et culture")) {
+    types.push("Art et culture");
   }
 
   return types;
