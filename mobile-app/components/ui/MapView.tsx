@@ -14,6 +14,7 @@ type Project = {
   longitude: number;
   project_type: string;
   status: string;
+  country?: string;
   city?: string;
   quartier?: string;
   developer?: string;
@@ -154,10 +155,125 @@ type ExtendedHotelDetails = {
   keys?: string;
   floors?: string;
   openingDate?: string;
-  rooms?: Array<{ type?: string; count?: string; surface?: string }>;
-  fnb?: Array<{ name?: string; type?: string; capacity?: string }>;
-  mice?: Array<{ name?: string; type?: string; roomsCount?: string; capacity?: string; surface?: string }>;
-  leisure?: Array<{ name?: string; type?: string; count?: string; surface?: string; capacity?: string }>;
+  rooms?: Array<{ type?: string; count?: string; surface?: string; pricePerNight?: string; priceUnit?: string }>;
+  fnb?: Array<{ name?: string; type?: string; capacity?: string; pricingAmount?: string; pricingUnit?: string }>;
+  mice?: Array<{ name?: string; type?: string; roomsCount?: string; capacity?: string; surface?: string; pricingAmount?: string; pricingUnit?: string }>;
+  leisure?: Array<{ name?: string; type?: string; count?: string; surface?: string; capacity?: string; pricingAmount?: string; pricingUnit?: string }>;
+};
+
+type ExtendedSportDetails = {
+  subtype?: string;
+  renovationDate?: string;
+  capacity?: string;
+  positioning?: string;
+  targets?: string[];
+  targetsOther?: string;
+  description?: string;
+  activities?: string[];
+  activitiesOther?: string;
+  equipments?: string[];
+  equipmentsOther?: string;
+  services?: string[];
+  servicesOther?: string;
+  fnb?: string[];
+  fnbOther?: string;
+  pricingMembershipFee?: string;
+  pricingMonthly?: string;
+  pricingAnnual?: string;
+  pricingDaily?: string;
+  pricingPerActivity?: string;
+  currentMembers?: string;
+  renewalRate?: string;
+  labels?: string;
+  businessModels?: string[];
+};
+
+type ExtendedEducationDetails = {
+  subtype?: string;
+  renovationDate?: string;
+  capacity?: string;
+  students?: string;
+  internationalStudents?: string;
+  teachers?: string;
+  positioning?: string;
+  targets?: string[];
+  targetsOther?: string;
+  description?: string;
+  programs?: string[];
+  programsOther?: string;
+  axes?: string[];
+  axesOther?: string;
+  equipments?: string[];
+  equipmentsOther?: string;
+  services?: string[];
+  servicesOther?: string;
+  fnb?: string[];
+  contractModels?: string[];
+  contractModelsOther?: string;
+  partners?: string;
+  accreditations?: string;
+  businessModels?: string[];
+};
+
+type ExtendedArtCultureDetails = {
+  subtype?: string;
+  renovationDate?: string;
+  operator?: string;
+  capacity?: string;
+  positioning?: string;
+  targets?: string[];
+  targetsOther?: string;
+  description?: string;
+  activities?: string[];
+  activitiesOther?: string;
+  equipments?: string[];
+  equipmentsOther?: string;
+  services?: string[];
+  servicesOther?: string;
+  fnb?: string[];
+  fnbOther?: string;
+  spaceCapacities?: Array<{ name?: string; capacity?: string; surface?: string }>;
+  highlights?: string;
+  managementModels?: string[];
+  managementModelsOther?: string;
+  businessModels?: string[];
+  partners?: string[];
+  partnersOther?: string;
+  labels?: string[];
+  labelsOther?: string;
+};
+
+type ExtendedLeisureDetails = {
+  subtype?: string;
+  builtSurface?: string;
+  renovationDate?: string;
+  capacity?: string;
+  annualVisitors?: string;
+  positioning?: string;
+  targets?: string[];
+  description?: string;
+  activities?: string[];
+  activitiesOther?: string;
+  equipments?: string[];
+  equipmentsOther?: string;
+  services?: string[];
+  servicesOther?: string;
+  fnb?: string[];
+  spaceCapacities?: Array<{ name?: string; capacity?: string; surface?: string }>;
+  highlights?: string;
+  seasonality?: string[];
+  managementModels?: string[];
+  managementModelsOther?: string;
+  businessModels?: string[];
+  partners?: string;
+  labels?: string;
+  pricingAdult?: string;
+  pricingChild?: string;
+  pricingFamily?: string;
+  pricingAnnualPass?: string;
+  pricingGroup?: string;
+  pricingCorporate?: string;
+  pricingPerActivity?: string;
 };
 
 type ProjectExtendedDetails = {
@@ -165,6 +281,10 @@ type ProjectExtendedDetails = {
   office?: ExtendedOfficeDetails;
   health?: ExtendedHealthDetails;
   hotel?: ExtendedHotelDetails;
+  sport?: ExtendedSportDetails;
+  education?: ExtendedEducationDetails;
+  artCulture?: ExtendedArtCultureDetails;
+  leisure?: ExtendedLeisureDetails;
 };
 
 type MapViewProps = {
@@ -859,6 +979,10 @@ export default function MapScreen({
   const isOfficeSelected = selectedTypeFilters.includes("Bureau");
   const isHealthSelected = selectedTypeFilters.includes("Santé");
   const isHotelSelected = selectedTypeFilters.includes("Hotel");
+  const isSportSelected = selectedTypeFilters.includes("Sport");
+  const isEducationSelected = selectedTypeFilters.includes("Education");
+  const isArtCultureSelected = selectedTypeFilters.includes("Art et culture");
+  const isLeisureSelected = selectedTypeFilters.includes("Loisir");
 
   const normalizeUrl = (value: string) => {
     const trimmed = value.trim();
@@ -1485,6 +1609,7 @@ export default function MapScreen({
             <View style={styles.headerMetaRow}>
               {selectedProject?.project_type ? <Text style={styles.headerMetaPill}>{selectedProject.project_type}</Text> : null}
               {selectedProject?.status ? <Text style={styles.headerMetaPill}>{selectedProject.status}</Text> : null}
+              {selectedProject?.country ? <Text style={styles.headerMetaPill}>{selectedProject.country}</Text> : null}
               {selectedProject?.city ? <Text style={styles.headerMetaPill}>{selectedProject.city}</Text> : null}
             </View>
 
@@ -1531,7 +1656,7 @@ export default function MapScreen({
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>Localisation</Text>
                     <Text style={styles.detailsValue}>
-                      {selectedProject.city}{selectedProject.quartier ? `, ${selectedProject.quartier}` : ""}
+                      {[selectedProject.country, selectedProject.city, selectedProject.quartier].filter(Boolean).join(", ")}
                     </Text>
                   </View>
 
@@ -2112,7 +2237,7 @@ export default function MapScreen({
                           <Text style={styles.detailsLabel}>Chambres</Text>
                           {projectExtendedDetails.hotel.rooms.map((room, index) => (
                             <Text key={`${room.type || "room"}-${index}`} style={styles.detailsValue}>
-                              • {room.type || `Type ${index + 1}`}{room.count ? ` - ${room.count}` : ""}{room.surface ? ` - ${room.surface} m²` : ""}
+                              • {room.type || `Type ${index + 1}`}{room.count ? ` - ${room.count}` : ""}{room.surface ? ` - ${room.surface} m²` : ""}{room.pricePerNight ? ` - ${room.pricePerNight} ${room.priceUnit || "MAD"}/nuit` : ""}
                             </Text>
                           ))}
                         </View>
@@ -2123,7 +2248,7 @@ export default function MapScreen({
                           <Text style={styles.detailsLabel}>F&B</Text>
                           {projectExtendedDetails.hotel.fnb.map((item, index) => (
                             <Text key={`${item.name || "fnb"}-${index}`} style={styles.detailsValue}>
-                              • {item.name || `Item ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.capacity ? ` - ${item.capacity}` : ""}
+                              • {item.name || `Item ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}
                             </Text>
                           ))}
                         </View>
@@ -2134,7 +2259,7 @@ export default function MapScreen({
                           <Text style={styles.detailsLabel}>MICE</Text>
                           {projectExtendedDetails.hotel.mice.map((item, index) => (
                             <Text key={`${item.name || "mice"}-${index}`} style={styles.detailsValue}>
-                              • {item.name || `Espace ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.roomsCount ? ` - ${item.roomsCount} salles` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}
+                              • {item.name || `Espace ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.roomsCount ? ` - ${item.roomsCount} salles` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}
                             </Text>
                           ))}
                         </View>
@@ -2145,11 +2270,175 @@ export default function MapScreen({
                           <Text style={styles.detailsLabel}>Loisirs</Text>
                           {projectExtendedDetails.hotel.leisure.map((item, index) => (
                             <Text key={`${item.name || "loisir"}-${index}`} style={styles.detailsValue}>
-                              • {item.name || `Loisir ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.count ? ` - ${item.count}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}{item.capacity ? ` - ${item.capacity}` : ""}
+                              • {item.name || `Loisir ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.count ? ` - ${item.count}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}
                             </Text>
                           ))}
                         </View>
                       )}
+                    </>
+                  )}
+
+                  {/* === SPORT === */}
+                  {isSportSelected && projectExtendedDetails?.sport && (
+                    <>
+                      {projectExtendedDetails.sport.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.sport.subtype}</Text></View> : null}
+                      {projectExtendedDetails.sport.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.sport.renovationDate}</Text></View> : null}
+                      {projectExtendedDetails.sport.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.sport.description}</Text></View> : null}
+                      {(projectExtendedDetails.sport.capacity || projectExtendedDetails.sport.positioning) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.sport.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.sport.capacity}</Text> : null}
+                          {projectExtendedDetails.sport.positioning ? <Text style={styles.detailsValue}>Positionnement: {projectExtendedDetails.sport.positioning}</Text> : null}
+                        </View>
+                      ) : null}
+                      {(projectExtendedDetails.sport.targets?.length || projectExtendedDetails.sport.targetsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Clientèle cible</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.targets), projectExtendedDetails.sport.targetsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.sport.activities?.length || projectExtendedDetails.sport.activitiesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Activités</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.activities), projectExtendedDetails.sport.activitiesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.sport.equipments?.length || projectExtendedDetails.sport.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.equipments), projectExtendedDetails.sport.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.sport.services?.length || projectExtendedDetails.sport.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.services), projectExtendedDetails.sport.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.sport.fnb?.length || projectExtendedDetails.sport.fnbOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.fnb), projectExtendedDetails.sport.fnbOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.sport.pricingMembershipFee || projectExtendedDetails.sport.pricingMonthly || projectExtendedDetails.sport.pricingAnnual || projectExtendedDetails.sport.pricingDaily || projectExtendedDetails.sport.pricingPerActivity) ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Tarification</Text>
+                          {projectExtendedDetails.sport.pricingMembershipFee ? <Text style={styles.detailsValue}>Frais d'adhésion: {projectExtendedDetails.sport.pricingMembershipFee}</Text> : null}
+                          {projectExtendedDetails.sport.pricingMonthly ? <Text style={styles.detailsValue}>Mensuel: {projectExtendedDetails.sport.pricingMonthly}</Text> : null}
+                          {projectExtendedDetails.sport.pricingAnnual ? <Text style={styles.detailsValue}>Annuel: {projectExtendedDetails.sport.pricingAnnual}</Text> : null}
+                          {projectExtendedDetails.sport.pricingDaily ? <Text style={styles.detailsValue}>Journalier: {projectExtendedDetails.sport.pricingDaily}</Text> : null}
+                          {projectExtendedDetails.sport.pricingPerActivity ? <Text style={styles.detailsValue}>Par activité: {projectExtendedDetails.sport.pricingPerActivity}</Text> : null}
+                        </View>
+                      ) : null}
+                      {(projectExtendedDetails.sport.currentMembers || projectExtendedDetails.sport.renewalRate || projectExtendedDetails.sport.labels || projectExtendedDetails.sport.businessModels?.length) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.sport.currentMembers ? <Text style={styles.detailsValue}>Membres actuels: {projectExtendedDetails.sport.currentMembers}</Text> : null}
+                          {projectExtendedDetails.sport.renewalRate ? <Text style={styles.detailsValue}>Taux de renouvellement: {projectExtendedDetails.sport.renewalRate}</Text> : null}
+                          {projectExtendedDetails.sport.labels ? <Text style={styles.detailsValue}>Labels: {projectExtendedDetails.sport.labels}</Text> : null}
+                          {projectExtendedDetails.sport.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.sport.businessModels)}</Text> : null}
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* === EDUCATION === */}
+                  {isEducationSelected && projectExtendedDetails?.education && (
+                    <>
+                      {projectExtendedDetails.education.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.subtype}</Text></View> : null}
+                      {projectExtendedDetails.education.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.renovationDate}</Text></View> : null}
+                      {projectExtendedDetails.education.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.description}</Text></View> : null}
+                      {(projectExtendedDetails.education.capacity || projectExtendedDetails.education.students || projectExtendedDetails.education.internationalStudents || projectExtendedDetails.education.teachers) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.education.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.education.capacity}</Text> : null}
+                          {projectExtendedDetails.education.students ? <Text style={styles.detailsValue}>Étudiants: {projectExtendedDetails.education.students}</Text> : null}
+                          {projectExtendedDetails.education.internationalStudents ? <Text style={styles.detailsValue}>Étudiants internationaux: {projectExtendedDetails.education.internationalStudents}</Text> : null}
+                          {projectExtendedDetails.education.teachers ? <Text style={styles.detailsValue}>Corps enseignant: {projectExtendedDetails.education.teachers}</Text> : null}
+                        </View>
+                      ) : null}
+                      {projectExtendedDetails.education.positioning ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Positionnement</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.positioning}</Text></View> : null}
+                      {(projectExtendedDetails.education.targets?.length || projectExtendedDetails.education.targetsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Public cible</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.targets), projectExtendedDetails.education.targetsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.education.programs?.length || projectExtendedDetails.education.programsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Programmes</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.programs), projectExtendedDetails.education.programsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.education.axes?.length || projectExtendedDetails.education.axesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Axes</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.axes), projectExtendedDetails.education.axesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.education.equipments?.length || projectExtendedDetails.education.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.equipments), projectExtendedDetails.education.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.education.services?.length || projectExtendedDetails.education.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.services), projectExtendedDetails.education.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {projectExtendedDetails.education.fnb?.length ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{formatArray(projectExtendedDetails.education.fnb)}</Text></View> : null}
+                      {(projectExtendedDetails.education.contractModels?.length || projectExtendedDetails.education.contractModelsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Modèle contractuel</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.contractModels), projectExtendedDetails.education.contractModelsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.education.partners || projectExtendedDetails.education.accreditations || projectExtendedDetails.education.businessModels?.length) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.education.partners ? <Text style={styles.detailsValue}>Partenaires: {projectExtendedDetails.education.partners}</Text> : null}
+                          {projectExtendedDetails.education.accreditations ? <Text style={styles.detailsValue}>Accréditations: {projectExtendedDetails.education.accreditations}</Text> : null}
+                          {projectExtendedDetails.education.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.education.businessModels)}</Text> : null}
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* === ART ET CULTURE === */}
+                  {isArtCultureSelected && projectExtendedDetails?.artCulture && (
+                    <>
+                      {projectExtendedDetails.artCulture.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.subtype}</Text></View> : null}
+                      {projectExtendedDetails.artCulture.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.renovationDate}</Text></View> : null}
+                      {projectExtendedDetails.artCulture.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.description}</Text></View> : null}
+                      {(projectExtendedDetails.artCulture.operator || projectExtendedDetails.artCulture.capacity || projectExtendedDetails.artCulture.positioning) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.artCulture.operator ? <Text style={styles.detailsValue}>Opérateur: {projectExtendedDetails.artCulture.operator}</Text> : null}
+                          {projectExtendedDetails.artCulture.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.artCulture.capacity}</Text> : null}
+                          {projectExtendedDetails.artCulture.positioning ? <Text style={styles.detailsValue}>Positionnement: {projectExtendedDetails.artCulture.positioning}</Text> : null}
+                        </View>
+                      ) : null}
+                      {(projectExtendedDetails.artCulture.targets?.length || projectExtendedDetails.artCulture.targetsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Public cible</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.targets), projectExtendedDetails.artCulture.targetsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.artCulture.activities?.length || projectExtendedDetails.artCulture.activitiesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Activités</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.activities), projectExtendedDetails.artCulture.activitiesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.artCulture.equipments?.length || projectExtendedDetails.artCulture.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.equipments), projectExtendedDetails.artCulture.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.artCulture.services?.length || projectExtendedDetails.artCulture.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.services), projectExtendedDetails.artCulture.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.artCulture.fnb?.length || projectExtendedDetails.artCulture.fnbOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.fnb), projectExtendedDetails.artCulture.fnbOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {projectExtendedDetails.artCulture.spaceCapacities?.length ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Espaces & capacités</Text>
+                          {projectExtendedDetails.artCulture.spaceCapacities.map((space, index) => (
+                            <Text key={`${space.name || "space"}-${index}`} style={styles.detailsValue}>
+                              • {space.name || `Espace ${index + 1}`}{space.capacity ? ` - ${space.capacity}` : ""}{space.surface ? ` - ${space.surface} m²` : ""}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : null}
+                      {(projectExtendedDetails.artCulture.highlights || projectExtendedDetails.artCulture.managementModels?.length || projectExtendedDetails.artCulture.managementModelsOther || projectExtendedDetails.artCulture.businessModels?.length || projectExtendedDetails.artCulture.partners?.length || projectExtendedDetails.artCulture.partnersOther || projectExtendedDetails.artCulture.labels?.length || projectExtendedDetails.artCulture.labelsOther) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.artCulture.highlights ? <Text style={styles.detailsValue}>Points forts: {projectExtendedDetails.artCulture.highlights}</Text> : null}
+                          {(projectExtendedDetails.artCulture.managementModels?.length || projectExtendedDetails.artCulture.managementModelsOther) ? <Text style={styles.detailsValue}>Management: {[formatArray(projectExtendedDetails.artCulture.managementModels), projectExtendedDetails.artCulture.managementModelsOther].filter(Boolean).join(" • ")}</Text> : null}
+                          {projectExtendedDetails.artCulture.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.artCulture.businessModels)}</Text> : null}
+                          {(projectExtendedDetails.artCulture.partners?.length || projectExtendedDetails.artCulture.partnersOther) ? <Text style={styles.detailsValue}>Partenaires: {[formatArray(projectExtendedDetails.artCulture.partners), projectExtendedDetails.artCulture.partnersOther].filter(Boolean).join(" • ")}</Text> : null}
+                          {(projectExtendedDetails.artCulture.labels?.length || projectExtendedDetails.artCulture.labelsOther) ? <Text style={styles.detailsValue}>Labels: {[formatArray(projectExtendedDetails.artCulture.labels), projectExtendedDetails.artCulture.labelsOther].filter(Boolean).join(" • ")}</Text> : null}
+                        </View>
+                      ) : null}
+                    </>
+                  )}
+
+                  {/* === LOISIR === */}
+                  {isLeisureSelected && projectExtendedDetails?.leisure && (
+                    <>
+                      {projectExtendedDetails.leisure.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.leisure.subtype}</Text></View> : null}
+                      {projectExtendedDetails.leisure.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.leisure.renovationDate}</Text></View> : null}
+                      {projectExtendedDetails.leisure.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.leisure.description}</Text></View> : null}
+                      {(projectExtendedDetails.leisure.builtSurface || projectExtendedDetails.leisure.capacity || projectExtendedDetails.leisure.annualVisitors || projectExtendedDetails.leisure.positioning) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.leisure.builtSurface ? <Text style={styles.detailsValue}>Surface bâtie: {projectExtendedDetails.leisure.builtSurface}</Text> : null}
+                          {projectExtendedDetails.leisure.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.leisure.capacity}</Text> : null}
+                          {projectExtendedDetails.leisure.annualVisitors ? <Text style={styles.detailsValue}>Visiteurs annuels: {projectExtendedDetails.leisure.annualVisitors}</Text> : null}
+                          {projectExtendedDetails.leisure.positioning ? <Text style={styles.detailsValue}>Positionnement: {projectExtendedDetails.leisure.positioning}</Text> : null}
+                        </View>
+                      ) : null}
+                      {projectExtendedDetails.leisure.targets?.length ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Public cible</Text><Text style={styles.detailsValue}>{formatArray(projectExtendedDetails.leisure.targets)}</Text></View> : null}
+                      {(projectExtendedDetails.leisure.activities?.length || projectExtendedDetails.leisure.activitiesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Activités</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.leisure.activities), projectExtendedDetails.leisure.activitiesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.leisure.equipments?.length || projectExtendedDetails.leisure.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.leisure.equipments), projectExtendedDetails.leisure.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {(projectExtendedDetails.leisure.services?.length || projectExtendedDetails.leisure.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.leisure.services), projectExtendedDetails.leisure.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
+                      {projectExtendedDetails.leisure.fnb?.length ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{formatArray(projectExtendedDetails.leisure.fnb)}</Text></View> : null}
+                      {projectExtendedDetails.leisure.spaceCapacities?.length ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Espaces & capacités</Text>
+                          {projectExtendedDetails.leisure.spaceCapacities.map((space, index) => (
+                            <Text key={`${space.name || "space"}-${index}`} style={styles.detailsValue}>
+                              • {space.name || `Espace ${index + 1}`}{space.capacity ? ` - ${space.capacity}` : ""}{space.surface ? ` - ${space.surface} m²` : ""}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : null}
+                      {(projectExtendedDetails.leisure.highlights || projectExtendedDetails.leisure.seasonality?.length || projectExtendedDetails.leisure.managementModels?.length || projectExtendedDetails.leisure.managementModelsOther || projectExtendedDetails.leisure.businessModels?.length || projectExtendedDetails.leisure.partners || projectExtendedDetails.leisure.labels) ? (
+                        <View style={styles.detailsSection}>
+                          {projectExtendedDetails.leisure.highlights ? <Text style={styles.detailsValue}>Points forts: {projectExtendedDetails.leisure.highlights}</Text> : null}
+                          {projectExtendedDetails.leisure.seasonality?.length ? <Text style={styles.detailsValue}>Saisonnalité: {formatArray(projectExtendedDetails.leisure.seasonality)}</Text> : null}
+                          {(projectExtendedDetails.leisure.managementModels?.length || projectExtendedDetails.leisure.managementModelsOther) ? <Text style={styles.detailsValue}>Management: {[formatArray(projectExtendedDetails.leisure.managementModels), projectExtendedDetails.leisure.managementModelsOther].filter(Boolean).join(" • ")}</Text> : null}
+                          {projectExtendedDetails.leisure.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.leisure.businessModels)}</Text> : null}
+                          {projectExtendedDetails.leisure.partners ? <Text style={styles.detailsValue}>Partenaires: {projectExtendedDetails.leisure.partners}</Text> : null}
+                          {projectExtendedDetails.leisure.labels ? <Text style={styles.detailsValue}>Labels: {projectExtendedDetails.leisure.labels}</Text> : null}
+                        </View>
+                      ) : null}
+                      {(projectExtendedDetails.leisure.pricingAdult || projectExtendedDetails.leisure.pricingChild || projectExtendedDetails.leisure.pricingFamily || projectExtendedDetails.leisure.pricingAnnualPass || projectExtendedDetails.leisure.pricingGroup || projectExtendedDetails.leisure.pricingCorporate || projectExtendedDetails.leisure.pricingPerActivity) ? (
+                        <View style={styles.detailsSection}>
+                          <Text style={styles.detailsLabel}>Tarification</Text>
+                          {projectExtendedDetails.leisure.pricingAdult ? <Text style={styles.detailsValue}>Adulte: {projectExtendedDetails.leisure.pricingAdult}</Text> : null}
+                          {projectExtendedDetails.leisure.pricingChild ? <Text style={styles.detailsValue}>Enfant: {projectExtendedDetails.leisure.pricingChild}</Text> : null}
+                          {projectExtendedDetails.leisure.pricingFamily ? <Text style={styles.detailsValue}>Famille: {projectExtendedDetails.leisure.pricingFamily}</Text> : null}
+                          {projectExtendedDetails.leisure.pricingAnnualPass ? <Text style={styles.detailsValue}>Pass annuel: {projectExtendedDetails.leisure.pricingAnnualPass}</Text> : null}
+                          {projectExtendedDetails.leisure.pricingGroup ? <Text style={styles.detailsValue}>Groupe: {projectExtendedDetails.leisure.pricingGroup}</Text> : null}
+                          {projectExtendedDetails.leisure.pricingCorporate ? <Text style={styles.detailsValue}>Corporate: {projectExtendedDetails.leisure.pricingCorporate}</Text> : null}
+                          {projectExtendedDetails.leisure.pricingPerActivity ? <Text style={styles.detailsValue}>Par activité: {projectExtendedDetails.leisure.pricingPerActivity}</Text> : null}
+                        </View>
+                      ) : null}
                     </>
                   )}
                 </>

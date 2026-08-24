@@ -63,6 +63,8 @@ type HotelRoomItem = {
   type: string;
   count: string;
   surface: string;
+  pricePerNight?: string;
+  priceUnit?: string;
 };
 
 type HotelServiceItem = {
@@ -72,6 +74,8 @@ type HotelServiceItem = {
   count?: string;
   roomsCount?: string;
   surface?: string;
+  pricingAmount?: string;
+  pricingUnit?: string;
 };
 
 type SpaceCapacityItem = {
@@ -107,6 +111,8 @@ const typologiesOptions = {
   Villa: ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
   "Lot de villas": ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
 };
+
+const countryOptions = ["Maroc", "Sénégal", "Côte d'Ivoire", "Cameroun", "Tunisie", "Algérie", "France", "Espagne", "Portugal", "UAE", "USA", "Autre"];
 
 const moroccoCities = [
   "Agadir",
@@ -783,6 +789,16 @@ const monthNames = [
   "Décembre",
 ];
 
+type CalendarField =
+  | "delivery"
+  | "start"
+  | "opening"
+  | "hotelRenovation"
+  | "sportRenovation"
+  | "educationRenovation"
+  | "artCultureRenovation"
+  | "leisureRenovation";
+
 const getCalendarMatrix = (date: Date) => {
   const year = date.getFullYear();
   const month = date.getMonth();
@@ -904,6 +920,7 @@ export default function AddProjectScreen() {
 
   // --- Infos globales projet ---
   const [name, setName] = useState("");
+  const [country, setCountry] = useState("Maroc");
   const [city, setCity] = useState("");
   const [quartier, setQuartier] = useState("");
   const [developer, setDeveloper] = useState("");
@@ -916,7 +933,7 @@ export default function AddProjectScreen() {
   const [deliveryDateObj, setDeliveryDateObj] = useState<Date | null>(null);
   const [startCommercialDateObj, setStartCommercialDateObj] = useState<Date | null>(null);
   const [openingDateObj, setOpeningDateObj] = useState<Date | null>(null);
-  const [activeCalendar, setActiveCalendar] = useState<"delivery" | "start" | "opening" | null>(null);
+  const [activeCalendar, setActiveCalendar] = useState<CalendarField | null>(null);
 
   // --- Surfaces Foncières ---
   const [surfaceFonciereTotal, setSurfaceFonciereTotal] = useState("");
@@ -1059,24 +1076,26 @@ export default function AddProjectScreen() {
   const [hotelInvestor, setHotelInvestor] = useState("");
   const [hotelManager, setHotelManager] = useState("");
   const [hotelRenovationDate, setHotelRenovationDate] = useState("");
+  const [hotelRenovationDateObj, setHotelRenovationDateObj] = useState<Date | null>(null);
   const [hotelKeys, setHotelKeys] = useState("");
   const [hotelFloors, setHotelFloors] = useState("");
   const [hotelRooms, setHotelRooms] = useState<HotelRoomItem[]>([]);
-  const [hotelRoomInput, setHotelRoomInput] = useState<HotelRoomItem>({ type: "", count: "", surface: "" });
+  const [hotelRoomInput, setHotelRoomInput] = useState<HotelRoomItem>({ type: "", count: "", surface: "", pricePerNight: "", priceUnit: "MAD" });
   const [editingHotelRoomIndex, setEditingHotelRoomIndex] = useState<number | null>(null);
   const [hotelFnB, setHotelFnB] = useState<HotelServiceItem[]>([]);
-  const [hotelFnBInput, setHotelFnBInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "" });
+  const [hotelFnBInput, setHotelFnBInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", pricingAmount: "", pricingUnit: "MAD" });
   const [editingHotelFnBIndex, setEditingHotelFnBIndex] = useState<number | null>(null);
   const [hotelMice, setHotelMice] = useState<HotelServiceItem[]>([]);
-  const [hotelMiceInput, setHotelMiceInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", roomsCount: "", surface: "" });
+  const [hotelMiceInput, setHotelMiceInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", roomsCount: "", surface: "", pricingAmount: "", pricingUnit: "MAD" });
   const [editingHotelMiceIndex, setEditingHotelMiceIndex] = useState<number | null>(null);
   const [hotelLeisure, setHotelLeisure] = useState<HotelServiceItem[]>([]);
-  const [hotelLeisureInput, setHotelLeisureInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", count: "", surface: "" });
+  const [hotelLeisureInput, setHotelLeisureInput] = useState<HotelServiceItem>({ name: "", type: "", capacity: "", count: "", surface: "", pricingAmount: "", pricingUnit: "MAD" });
   const [editingHotelLeisureIndex, setEditingHotelLeisureIndex] = useState<number | null>(null);
 
   const [sportSubtype, setSportSubtype] = useState("");
   const [sportCreationDate, setSportCreationDate] = useState("");
   const [sportRenovationDate, setSportRenovationDate] = useState("");
+  const [sportRenovationDateObj, setSportRenovationDateObj] = useState<Date | null>(null);
   const [sportFloors, setSportFloors] = useState("");
   const [sportCapacity, setSportCapacity] = useState("");
   const [sportPositioning, setSportPositioning] = useState("");
@@ -1103,6 +1122,7 @@ export default function AddProjectScreen() {
   const [educationSubtype, setEducationSubtype] = useState("");
   const [educationCreationDate, setEducationCreationDate] = useState("");
   const [educationRenovationDate, setEducationRenovationDate] = useState("");
+  const [educationRenovationDateObj, setEducationRenovationDateObj] = useState<Date | null>(null);
   const [educationFloors, setEducationFloors] = useState("");
   const [educationCapacity, setEducationCapacity] = useState("");
   const [educationStudents, setEducationStudents] = useState("");
@@ -1130,6 +1150,7 @@ export default function AddProjectScreen() {
   const [artCultureSubtype, setArtCultureSubtype] = useState("");
   const [artCultureCreationDate, setArtCultureCreationDate] = useState("");
   const [artCultureRenovationDate, setArtCultureRenovationDate] = useState("");
+  const [artCultureRenovationDateObj, setArtCultureRenovationDateObj] = useState<Date | null>(null);
   const [artCultureOperator, setArtCultureOperator] = useState("");
   const [artCultureFloors, setArtCultureFloors] = useState("");
   const [artCultureCapacity, setArtCultureCapacity] = useState("");
@@ -1161,6 +1182,7 @@ export default function AddProjectScreen() {
   const [leisureBuiltSurface, setLeisureBuiltSurface] = useState("");
   const [leisureCreationDate, setLeisureCreationDate] = useState("");
   const [leisureRenovationDate, setLeisureRenovationDate] = useState("");
+  const [leisureRenovationDateObj, setLeisureRenovationDateObj] = useState<Date | null>(null);
   const [leisureFloors, setLeisureFloors] = useState("");
   const [leisureCapacity, setLeisureCapacity] = useState("");
   const [leisureAnnualVisitors, setLeisureAnnualVisitors] = useState("");
@@ -1244,6 +1266,7 @@ export default function AddProjectScreen() {
       
       // Infos générales
       setName("");
+      setCountry("Maroc");
       setCity("");
       setQuartier("");
       setDeveloper("");
@@ -1390,24 +1413,26 @@ export default function AddProjectScreen() {
       setHotelInvestor("");
       setHotelManager("");
       setHotelRenovationDate("");
+      setHotelRenovationDateObj(null);
       setHotelKeys("");
       setHotelFloors("");
       setHotelRooms([]);
-      setHotelRoomInput({ type: "", count: "", surface: "" });
+      setHotelRoomInput({ type: "", count: "", surface: "", pricePerNight: "", priceUnit: "MAD" });
       setEditingHotelRoomIndex(null);
       setHotelFnB([]);
-      setHotelFnBInput({ name: "", type: "", capacity: "" });
+      setHotelFnBInput({ name: "", type: "", capacity: "", pricingAmount: "", pricingUnit: "MAD" });
       setEditingHotelFnBIndex(null);
       setHotelMice([]);
-      setHotelMiceInput({ name: "", type: "", capacity: "", roomsCount: "", surface: "" });
+      setHotelMiceInput({ name: "", type: "", capacity: "", roomsCount: "", surface: "", pricingAmount: "", pricingUnit: "MAD" });
       setEditingHotelMiceIndex(null);
       setHotelLeisure([]);
-      setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "" });
+      setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "", pricingAmount: "", pricingUnit: "MAD" });
       setEditingHotelLeisureIndex(null);
 
       setSportSubtype("");
       setSportCreationDate("");
       setSportRenovationDate("");
+      setSportRenovationDateObj(null);
       setSportFloors("");
       setSportCapacity("");
       setSportPositioning("");
@@ -1434,6 +1459,7 @@ export default function AddProjectScreen() {
       setEducationSubtype("");
       setEducationCreationDate("");
       setEducationRenovationDate("");
+      setEducationRenovationDateObj(null);
       setEducationFloors("");
       setEducationCapacity("");
       setEducationStudents("");
@@ -1461,6 +1487,7 @@ export default function AddProjectScreen() {
       setArtCultureSubtype("");
       setArtCultureCreationDate("");
       setArtCultureRenovationDate("");
+      setArtCultureRenovationDateObj(null);
       setArtCultureOperator("");
       setArtCultureFloors("");
       setArtCultureCapacity("");
@@ -1492,6 +1519,7 @@ export default function AddProjectScreen() {
       setLeisureBuiltSurface("");
       setLeisureCreationDate("");
       setLeisureRenovationDate("");
+      setLeisureRenovationDateObj(null);
       setLeisureFloors("");
       setLeisureCapacity("");
       setLeisureAnnualVisitors("");
@@ -1702,7 +1730,7 @@ export default function AddProjectScreen() {
     if (!hotelRoomInput.type.trim()) return;
     const next = upsertListItem(hotelRooms, hotelRoomInput, editingHotelRoomIndex);
     setHotelRooms(next);
-    setHotelRoomInput({ type: "", count: "", surface: "" });
+    setHotelRoomInput({ type: "", count: "", surface: "", pricePerNight: "", priceUnit: "MAD" });
     setEditingHotelRoomIndex(null);
   };
 
@@ -1710,7 +1738,7 @@ export default function AddProjectScreen() {
     if (!hotelFnBInput.name.trim()) return;
     const next = upsertListItem(hotelFnB, hotelFnBInput, editingHotelFnBIndex);
     setHotelFnB(next);
-    setHotelFnBInput({ name: "", type: "", capacity: "" });
+    setHotelFnBInput({ name: "", type: "", capacity: "", pricingAmount: "", pricingUnit: "MAD" });
     setEditingHotelFnBIndex(null);
   };
 
@@ -1718,7 +1746,7 @@ export default function AddProjectScreen() {
     if (!hotelMiceInput.name.trim()) return;
     const next = upsertListItem(hotelMice, hotelMiceInput, editingHotelMiceIndex);
     setHotelMice(next);
-    setHotelMiceInput({ name: "", type: "", capacity: "", roomsCount: "", surface: "" });
+    setHotelMiceInput({ name: "", type: "", capacity: "", roomsCount: "", surface: "", pricingAmount: "", pricingUnit: "MAD" });
     setEditingHotelMiceIndex(null);
   };
 
@@ -1726,7 +1754,7 @@ export default function AddProjectScreen() {
     if (!hotelLeisureInput.name.trim()) return;
     const next = upsertListItem(hotelLeisure, hotelLeisureInput, editingHotelLeisureIndex);
     setHotelLeisure(next);
-    setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "" });
+    setHotelLeisureInput({ name: "", type: "", capacity: "", count: "", surface: "", pricingAmount: "", pricingUnit: "MAD" });
     setEditingHotelLeisureIndex(null);
   };
 
@@ -1772,6 +1800,7 @@ export default function AddProjectScreen() {
       setShowMixedTypeModal(false);
       setProjectType(projectData.project_type || "");
       setName(projectData.name || "");
+      setCountry(projectData.country || "Maroc");
       setCity(projectData.city || "");
       setQuartier(projectData.quartier || "");
       setDeveloper(projectData.developer || "");
@@ -1969,18 +1998,64 @@ export default function AddProjectScreen() {
         setHotelInvestor(hotel.investor || "");
         setHotelManager(hotel.manager || "");
         setHotelRenovationDate(hotel.renovationDate || "");
+        setHotelRenovationDateObj(hotel.renovationDate ? new Date(hotel.renovationDate) : null);
         setHotelKeys(hotel.keys || "");
         setHotelFloors(hotel.floors || "");
-        setHotelRooms(Array.isArray(hotel.rooms) ? hotel.rooms : []);
-        setHotelFnB(Array.isArray(hotel.fnb) ? hotel.fnb : []);
-        setHotelMice(Array.isArray(hotel.mice) ? hotel.mice : []);
-        setHotelLeisure(Array.isArray(hotel.leisure) ? hotel.leisure : []);
+        setHotelRooms(
+          Array.isArray(hotel.rooms)
+            ? hotel.rooms.map((room: any) => ({
+                type: room.type || "",
+                count: room.count || "",
+                surface: room.surface || "",
+                pricePerNight: room.pricePerNight || "",
+                priceUnit: room.priceUnit || "MAD",
+              }))
+            : []
+        );
+        setHotelFnB(
+          Array.isArray(hotel.fnb)
+            ? hotel.fnb.map((item: any) => ({
+                name: item.name || "",
+                type: item.type || "",
+                capacity: item.capacity || "",
+                pricingAmount: item.pricingAmount || "",
+                pricingUnit: item.pricingUnit || "MAD",
+              }))
+            : []
+        );
+        setHotelMice(
+          Array.isArray(hotel.mice)
+            ? hotel.mice.map((item: any) => ({
+                name: item.name || "",
+                type: item.type || "",
+                capacity: item.capacity || "",
+                roomsCount: item.roomsCount || "",
+                surface: item.surface || "",
+                pricingAmount: item.pricingAmount || "",
+                pricingUnit: item.pricingUnit || "MAD",
+              }))
+            : []
+        );
+        setHotelLeisure(
+          Array.isArray(hotel.leisure)
+            ? hotel.leisure.map((item: any) => ({
+                name: item.name || "",
+                type: item.type || "",
+                capacity: item.capacity || "",
+                count: item.count || "",
+                surface: item.surface || "",
+                pricingAmount: item.pricingAmount || "",
+                pricingUnit: item.pricingUnit || "MAD",
+              }))
+            : []
+        );
         setOpeningDate(hotel.openingDate || "");
         setOpeningDateObj(hotel.openingDate ? new Date(hotel.openingDate) : null);
 
         setSportSubtype(sport.subtype || "");
         setSportCreationDate(sport.creationDate || "");
         setSportRenovationDate(sport.renovationDate || "");
+        setSportRenovationDateObj(sport.renovationDate ? new Date(sport.renovationDate) : null);
         setSportFloors(sport.floors || "");
         setSportCapacity(sport.capacity || "");
         setSportPositioning(sport.positioning || "");
@@ -2007,6 +2082,7 @@ export default function AddProjectScreen() {
         setEducationSubtype(education.subtype || "");
         setEducationCreationDate(education.creationDate || "");
         setEducationRenovationDate(education.renovationDate || "");
+        setEducationRenovationDateObj(education.renovationDate ? new Date(education.renovationDate) : null);
         setEducationFloors(education.floors || "");
         setEducationCapacity(education.capacity || "");
         setEducationStudents(education.students || "");
@@ -2034,6 +2110,7 @@ export default function AddProjectScreen() {
         setArtCultureSubtype(artCulture.subtype || "");
         setArtCultureCreationDate(artCulture.creationDate || "");
         setArtCultureRenovationDate(artCulture.renovationDate || "");
+        setArtCultureRenovationDateObj(artCulture.renovationDate ? new Date(artCulture.renovationDate) : null);
         setArtCultureOperator(artCulture.operator || "");
         setArtCultureFloors(artCulture.floors || "");
         setArtCultureCapacity(artCulture.capacity || "");
@@ -2063,6 +2140,7 @@ export default function AddProjectScreen() {
         setLeisureBuiltSurface(leisure.builtSurface || "");
         setLeisureCreationDate(leisure.creationDate || "");
         setLeisureRenovationDate(leisure.renovationDate || "");
+        setLeisureRenovationDateObj(leisure.renovationDate ? new Date(leisure.renovationDate) : null);
         setLeisureFloors(leisure.floors || "");
         setLeisureCapacity(leisure.capacity || "");
         setLeisureAnnualVisitors(leisure.annualVisitors || "");
@@ -2132,45 +2210,130 @@ export default function AddProjectScreen() {
 
   const getCalendarRows = (date: Date) => getCalendarMatrix(date);
 
-  const changeCalendarMonth = (type: "delivery" | "start" | "opening", delta: number) => {
-    if (type === "delivery") {
-      const current = deliveryDateObj || new Date();
-      setDeliveryDateObj(new Date(current.getFullYear(), current.getMonth() + delta, 1));
-      return;
+  const getCalendarDateObj = (type: CalendarField) => {
+    switch (type) {
+      case "delivery":
+        return deliveryDateObj;
+      case "start":
+        return startCommercialDateObj;
+      case "opening":
+        return openingDateObj;
+      case "hotelRenovation":
+        return hotelRenovationDateObj;
+      case "sportRenovation":
+        return sportRenovationDateObj;
+      case "educationRenovation":
+        return educationRenovationDateObj;
+      case "artCultureRenovation":
+        return artCultureRenovationDateObj;
+      case "leisureRenovation":
+        return leisureRenovationDateObj;
+      default:
+        return null;
     }
-
-    if (type === "start") {
-      const current = startCommercialDateObj || new Date();
-      setStartCommercialDateObj(new Date(current.getFullYear(), current.getMonth() + delta, 1));
-      return;
-    }
-
-    const openingCurrent = openingDateObj || new Date();
-    setOpeningDateObj(new Date(openingCurrent.getFullYear(), openingCurrent.getMonth() + delta, 1));
   };
 
-  const changeCalendarYear = (type: "delivery" | "start" | "opening", deltaYears: number) => {
+  const getCalendarSelectedValue = (type: CalendarField) => {
+    switch (type) {
+      case "delivery":
+        return deliveryDate;
+      case "start":
+        return startCommercialDate;
+      case "opening":
+        return openingDate;
+      case "hotelRenovation":
+        return hotelRenovationDate;
+      case "sportRenovation":
+        return sportRenovationDate;
+      case "educationRenovation":
+        return educationRenovationDate;
+      case "artCultureRenovation":
+        return artCultureRenovationDate;
+      case "leisureRenovation":
+        return leisureRenovationDate;
+      default:
+        return "";
+    }
+  };
+
+  const changeCalendarMonth = (type: CalendarField, delta: number) => {
+    const current = getCalendarDateObj(type) || new Date();
+    const next = new Date(current.getFullYear(), current.getMonth() + delta, 1);
+
+    switch (type) {
+      case "delivery":
+        setDeliveryDateObj(next);
+        break;
+      case "start":
+        setStartCommercialDateObj(next);
+        break;
+      case "opening":
+        setOpeningDateObj(next);
+        break;
+      case "hotelRenovation":
+        setHotelRenovationDateObj(next);
+        break;
+      case "sportRenovation":
+        setSportRenovationDateObj(next);
+        break;
+      case "educationRenovation":
+        setEducationRenovationDateObj(next);
+        break;
+      case "artCultureRenovation":
+        setArtCultureRenovationDateObj(next);
+        break;
+      case "leisureRenovation":
+        setLeisureRenovationDateObj(next);
+        break;
+    }
+  };
+
+  const changeCalendarYear = (type: CalendarField, deltaYears: number) => {
     changeCalendarMonth(type, deltaYears * 12);
   };
 
-  const onCalendarDateSelect = (type: "delivery" | "start" | "opening", date: Date) => {
+  const onCalendarDateSelect = (type: CalendarField, date: Date) => {
     const value = formatDate(date);
-    if (type === "delivery") {
-      setDeliveryDateObj(date);
-      setDeliveryDate(value);
-      setShowDeliveryDatePicker(false);
-      setActiveCalendar(null);
-    } else if (type === "start") {
-      setStartCommercialDateObj(date);
-      setStartCommercialDate(value);
-      setShowStartCommercialDatePicker(false);
-      setActiveCalendar(null);
-    } else {
-      setOpeningDateObj(date);
-      setOpeningDate(value);
-      setShowOpeningDatePicker(false);
-      setActiveCalendar(null);
+
+    switch (type) {
+      case "delivery":
+        setDeliveryDateObj(date);
+        setDeliveryDate(value);
+        setShowDeliveryDatePicker(false);
+        break;
+      case "start":
+        setStartCommercialDateObj(date);
+        setStartCommercialDate(value);
+        setShowStartCommercialDatePicker(false);
+        break;
+      case "opening":
+        setOpeningDateObj(date);
+        setOpeningDate(value);
+        setShowOpeningDatePicker(false);
+        break;
+      case "hotelRenovation":
+        setHotelRenovationDateObj(date);
+        setHotelRenovationDate(value);
+        break;
+      case "sportRenovation":
+        setSportRenovationDateObj(date);
+        setSportRenovationDate(value);
+        break;
+      case "educationRenovation":
+        setEducationRenovationDateObj(date);
+        setEducationRenovationDate(value);
+        break;
+      case "artCultureRenovation":
+        setArtCultureRenovationDateObj(date);
+        setArtCultureRenovationDate(value);
+        break;
+      case "leisureRenovation":
+        setLeisureRenovationDateObj(date);
+        setLeisureRenovationDate(value);
+        break;
     }
+
+    setActiveCalendar(null);
   };
 
   const categories = getProjectCategories();
@@ -2489,6 +2652,7 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
 
     const projectDataBase = {
       name,
+      country: country || null,
       city,
       quartier,
       latitude,
@@ -2951,6 +3115,24 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
             value={name}
             onChangeText={setName}
           />
+          <Text style={styles.fieldLabel}>Pays</Text>
+          <View style={styles.chipsRow}>
+            {countryOptions.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.optionChip, country === option && styles.optionChipActive]}
+                onPress={() => setCountry(option)}
+              >
+                <Text style={[styles.optionChipText, country === option && styles.optionChipTextActive]}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput
+            placeholder="Pays (modifiable)"
+            style={styles.input}
+            value={country}
+            onChangeText={setCountry}
+          />
           <View
             style={[
               styles.suggestionFieldWrapper,
@@ -3226,19 +3408,63 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
           </TouchableOpacity>
 
           {projectType === "Sport" && (
-            <TextInput placeholder="Date de rénovation" style={styles.input} value={sportRenovationDate} onChangeText={setSportRenovationDate} />
+            <TouchableOpacity
+              style={styles.input}
+              activeOpacity={0.8}
+              onPress={() => {
+                setActiveCalendar("sportRenovation");
+                if (!sportRenovationDateObj) setSportRenovationDateObj(new Date());
+              }}
+            >
+              <Text style={[styles.dateInputText, !sportRenovationDate && styles.placeholderText]}>
+                {sportRenovationDate || "Date de rénovation"}
+              </Text>
+            </TouchableOpacity>
           )}
           {projectType === "Education" && (
-            <TextInput placeholder="Date de rénovation" style={styles.input} value={educationRenovationDate} onChangeText={setEducationRenovationDate} />
+            <TouchableOpacity
+              style={styles.input}
+              activeOpacity={0.8}
+              onPress={() => {
+                setActiveCalendar("educationRenovation");
+                if (!educationRenovationDateObj) setEducationRenovationDateObj(new Date());
+              }}
+            >
+              <Text style={[styles.dateInputText, !educationRenovationDate && styles.placeholderText]}>
+                {educationRenovationDate || "Date de rénovation"}
+              </Text>
+            </TouchableOpacity>
           )}
           {projectType === "Art et culture" && (
-            <TextInput placeholder="Date de rénovation" style={styles.input} value={artCultureRenovationDate} onChangeText={setArtCultureRenovationDate} />
+            <TouchableOpacity
+              style={styles.input}
+              activeOpacity={0.8}
+              onPress={() => {
+                setActiveCalendar("artCultureRenovation");
+                if (!artCultureRenovationDateObj) setArtCultureRenovationDateObj(new Date());
+              }}
+            >
+              <Text style={[styles.dateInputText, !artCultureRenovationDate && styles.placeholderText]}>
+                {artCultureRenovationDate || "Date de rénovation"}
+              </Text>
+            </TouchableOpacity>
           )}
           {projectType === "Loisir" && (
-            <TextInput placeholder="Date de rénovation" style={styles.input} value={leisureRenovationDate} onChangeText={setLeisureRenovationDate} />
+            <TouchableOpacity
+              style={styles.input}
+              activeOpacity={0.8}
+              onPress={() => {
+                setActiveCalendar("leisureRenovation");
+                if (!leisureRenovationDateObj) setLeisureRenovationDateObj(new Date());
+              }}
+            >
+              <Text style={[styles.dateInputText, !leisureRenovationDate && styles.placeholderText]}>
+                {leisureRenovationDate || "Date de rénovation"}
+              </Text>
+            </TouchableOpacity>
           )}
 
-          {(showDeliveryDatePicker || showStartCommercialDatePicker || showOpeningDatePicker) && (
+          {activeCalendar !== null && (
             <Modal transparent animationType="fade">
               <View style={styles.calendarModalOverlay}>
                 <View style={styles.calendarModal}>
@@ -3246,26 +3472,22 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <TouchableOpacity
                       style={styles.calendarNavButton}
                       onPress={() => {
-                        if (activeCalendar === "delivery") changeCalendarMonth("delivery", -1);
-                        else if (activeCalendar === "start") changeCalendarMonth("start", -1);
-                        else changeCalendarMonth("opening", -1);
+                        if (!activeCalendar) return;
+                        changeCalendarMonth(activeCalendar, -1);
                       }}
                     >
                       <Text style={styles.calendarNavButtonText}>{"<"}</Text>
                     </TouchableOpacity>
                     <Text style={styles.calendarTitle}>
-                      {activeCalendar === "delivery"
-                        ? `${monthNames[(deliveryDateObj || new Date()).getMonth()]} ${(deliveryDateObj || new Date()).getFullYear()}`
-                        : activeCalendar === "start"
-                          ? `${monthNames[(startCommercialDateObj || new Date()).getMonth()]} ${(startCommercialDateObj || new Date()).getFullYear()}`
-                          : `${monthNames[(openingDateObj || new Date()).getMonth()]} ${(openingDateObj || new Date()).getFullYear()}`}
+                      {activeCalendar
+                        ? `${monthNames[(getCalendarDateObj(activeCalendar) || new Date()).getMonth()]} ${(getCalendarDateObj(activeCalendar) || new Date()).getFullYear()}`
+                        : ""}
                     </Text>
                     <TouchableOpacity
                       style={styles.calendarNavButton}
                       onPress={() => {
-                        if (activeCalendar === "delivery") changeCalendarMonth("delivery", 1);
-                        else if (activeCalendar === "start") changeCalendarMonth("start", 1);
-                        else changeCalendarMonth("opening", 1);
+                        if (!activeCalendar) return;
+                        changeCalendarMonth(activeCalendar, 1);
                       }}
                     >
                       <Text style={styles.calendarNavButtonText}>{">"}</Text>
@@ -3276,9 +3498,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <TouchableOpacity
                       style={styles.calendarQuickButton}
                       onPress={() => {
-                        if (activeCalendar === "delivery") changeCalendarYear("delivery", -5);
-                        else if (activeCalendar === "start") changeCalendarYear("start", -5);
-                        else changeCalendarYear("opening", -5);
+                        if (!activeCalendar) return;
+                        changeCalendarYear(activeCalendar, -5);
                       }}
                     >
                       <Text style={styles.calendarQuickButtonText}>-5 ans</Text>
@@ -3286,9 +3507,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <TouchableOpacity
                       style={styles.calendarQuickButton}
                       onPress={() => {
-                        if (activeCalendar === "delivery") changeCalendarYear("delivery", -1);
-                        else if (activeCalendar === "start") changeCalendarYear("start", -1);
-                        else changeCalendarYear("opening", -1);
+                        if (!activeCalendar) return;
+                        changeCalendarYear(activeCalendar, -1);
                       }}
                     >
                       <Text style={styles.calendarQuickButtonText}>-1 an</Text>
@@ -3296,9 +3516,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <TouchableOpacity
                       style={styles.calendarQuickButton}
                       onPress={() => {
-                        if (activeCalendar === "delivery") changeCalendarYear("delivery", 1);
-                        else if (activeCalendar === "start") changeCalendarYear("start", 1);
-                        else changeCalendarYear("opening", 1);
+                        if (!activeCalendar) return;
+                        changeCalendarYear(activeCalendar, 1);
                       }}
                     >
                       <Text style={styles.calendarQuickButtonText}>+1 an</Text>
@@ -3306,9 +3525,8 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     <TouchableOpacity
                       style={styles.calendarQuickButton}
                       onPress={() => {
-                        if (activeCalendar === "delivery") changeCalendarYear("delivery", 5);
-                        else if (activeCalendar === "start") changeCalendarYear("start", 5);
-                        else changeCalendarYear("opening", 5);
+                        if (!activeCalendar) return;
+                        changeCalendarYear(activeCalendar, 5);
                       }}
                     >
                       <Text style={styles.calendarQuickButtonText}>+5 ans</Text>
@@ -3323,19 +3541,11 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                     ))}
                   </View>
 
-                  {(activeCalendar === "delivery"
-                    ? getCalendarRows(deliveryDateObj || new Date())
-                    : activeCalendar === "start"
-                      ? getCalendarRows(startCommercialDateObj || new Date())
-                      : getCalendarRows(openingDateObj || new Date())).map((week, weekIndex) => (
+                  {getCalendarRows(getCalendarDateObj(activeCalendar || "delivery") || new Date()).map((week, weekIndex) => (
                     <View key={weekIndex} style={styles.calendarRow}>
                       {week.map((day, dayIndex) => {
                         const isSelected = day
-                          ? (activeCalendar === "delivery"
-                              ? deliveryDate === formatDate(day)
-                              : activeCalendar === "start"
-                                ? startCommercialDate === formatDate(day)
-                                : openingDate === formatDate(day))
+                          ? getCalendarSelectedValue(activeCalendar || "delivery") === formatDate(day)
                           : false;
                         return (
                           <TouchableOpacity
@@ -4064,7 +4274,18 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               <TextInput placeholder="Opérateur" style={styles.input} value={hotelOperator} onChangeText={setHotelOperator} />
               <TextInput placeholder="Investisseur / Propriétaire" style={styles.input} value={hotelInvestor} onChangeText={setHotelInvestor} />
               <TextInput placeholder="Gestionnaire" style={styles.input} value={hotelManager} onChangeText={setHotelManager} />
-              <TextInput placeholder="Date de rénovation" style={styles.input} value={hotelRenovationDate} onChangeText={setHotelRenovationDate} />
+              <TouchableOpacity
+                style={styles.input}
+                activeOpacity={0.8}
+                onPress={() => {
+                  setActiveCalendar("hotelRenovation");
+                  if (!hotelRenovationDateObj) setHotelRenovationDateObj(new Date());
+                }}
+              >
+                <Text style={[styles.dateInputText, !hotelRenovationDate && styles.placeholderText]}>
+                  {hotelRenovationDate || "Date de rénovation"}
+                </Text>
+              </TouchableOpacity>
 
               <ThemedText style={styles.sectionTitle}>Hôtel - Hébergement</ThemedText>
               <TextInput placeholder="Nombre de clés" style={styles.input} value={hotelKeys} onChangeText={setHotelKeys} keyboardType="decimal-pad" />
@@ -4076,12 +4297,28 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
                 <TextInput placeholder="Nombre" style={[styles.input, styles.inlineInput]} value={hotelRoomInput.count} onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, count: text }))} keyboardType="decimal-pad" />
               </View>
               <TextInput placeholder="Surface (m²)" style={styles.input} value={hotelRoomInput.surface} onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, surface: text }))} keyboardType="decimal-pad" />
+              <View style={styles.inlineRow}>
+                <TextInput
+                  placeholder="Prix / nuit"
+                  style={[styles.input, styles.inlineInput]}
+                  value={hotelRoomInput.pricePerNight || ""}
+                  onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, pricePerNight: text }))}
+                  keyboardType="decimal-pad"
+                />
+                <TextInput
+                  placeholder="Devise (MAD, FCFA, USD...)"
+                  style={[styles.input, styles.inlineInput]}
+                  value={hotelRoomInput.priceUnit || "MAD"}
+                  onChangeText={(text) => setHotelRoomInput((previous) => ({ ...previous, priceUnit: text.toUpperCase() }))}
+                />
+              </View>
+              <Text style={styles.inlineHintText}>Mention: précisez si le tarif varie selon saison, pension, taxes, promotions ou canal de réservation.</Text>
               <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelRoom}>
                 <Text style={styles.inlineAddButtonText}>{editingHotelRoomIndex === null ? "Ajouter chambre" : "Modifier chambre"}</Text>
               </TouchableOpacity>
               {hotelRooms.map((item, index) => (
                 <View key={`${item.type}-${index}`} style={styles.inlineCardSimple}>
-                  <Text style={styles.inlineCardText}>{item.type} - {item.count} - {item.surface} m²</Text>
+                  <Text style={styles.inlineCardText}>{item.type} - {item.count} - {item.surface} m²{item.pricePerNight ? ` - ${item.pricePerNight} ${item.priceUnit || "MAD"}/nuit` : ""}</Text>
                   <View style={styles.inlineActionsRow}>
                     <TouchableOpacity onPress={() => { setHotelRoomInput(item); setEditingHotelRoomIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setHotelRooms((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
@@ -4093,10 +4330,14 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               <TextInput placeholder="Nom" style={styles.input} value={hotelFnBInput.name} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, name: text }))} />
               <TextInput placeholder="Type" style={styles.input} value={hotelFnBInput.type} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, type: text }))} />
               <TextInput placeholder="Capacité" style={styles.input} value={hotelFnBInput.capacity} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, capacity: text }))} />
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Pricing" style={[styles.input, styles.inlineInput]} value={hotelFnBInput.pricingAmount || ""} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, pricingAmount: text }))} keyboardType="decimal-pad" />
+                <TextInput placeholder="Devise" style={[styles.input, styles.inlineInput]} value={hotelFnBInput.pricingUnit || "MAD"} onChangeText={(text) => setHotelFnBInput((previous) => ({ ...previous, pricingUnit: text.toUpperCase() }))} />
+              </View>
               <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelFnB}><Text style={styles.inlineAddButtonText}>{editingHotelFnBIndex === null ? "Ajouter F&B" : "Modifier F&B"}</Text></TouchableOpacity>
               {hotelFnB.map((item, index) => (
                 <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
-                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.capacity}</Text>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.capacity}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}</Text>
                   <View style={styles.inlineActionsRow}>
                     <TouchableOpacity onPress={() => { setHotelFnBInput(item); setEditingHotelFnBIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setHotelFnB((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
@@ -4110,10 +4351,14 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               <TextInput placeholder="Nombre de salles" style={styles.input} value={hotelMiceInput.roomsCount || ""} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, roomsCount: text }))} />
               <TextInput placeholder="Capacité" style={styles.input} value={hotelMiceInput.capacity} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, capacity: text }))} />
               <TextInput placeholder="Surface" style={styles.input} value={hotelMiceInput.surface || ""} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, surface: text }))} />
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Pricing" style={[styles.input, styles.inlineInput]} value={hotelMiceInput.pricingAmount || ""} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, pricingAmount: text }))} keyboardType="decimal-pad" />
+                <TextInput placeholder="Devise" style={[styles.input, styles.inlineInput]} value={hotelMiceInput.pricingUnit || "MAD"} onChangeText={(text) => setHotelMiceInput((previous) => ({ ...previous, pricingUnit: text.toUpperCase() }))} />
+              </View>
               <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelMice}><Text style={styles.inlineAddButtonText}>{editingHotelMiceIndex === null ? "Ajouter MICE" : "Modifier MICE"}</Text></TouchableOpacity>
               {hotelMice.map((item, index) => (
                 <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
-                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.roomsCount} salles - {item.capacity}</Text>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.roomsCount} salles - {item.capacity}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}</Text>
                   <View style={styles.inlineActionsRow}>
                     <TouchableOpacity onPress={() => { setHotelMiceInput(item); setEditingHotelMiceIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setHotelMice((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
@@ -4127,10 +4372,14 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               <TextInput placeholder="Nombre" style={styles.input} value={hotelLeisureInput.count || ""} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, count: text }))} />
               <TextInput placeholder="Surface" style={styles.input} value={hotelLeisureInput.surface || ""} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, surface: text }))} />
               <TextInput placeholder="Capacité" style={styles.input} value={hotelLeisureInput.capacity} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, capacity: text }))} />
+              <View style={styles.inlineRow}>
+                <TextInput placeholder="Pricing" style={[styles.input, styles.inlineInput]} value={hotelLeisureInput.pricingAmount || ""} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, pricingAmount: text }))} keyboardType="decimal-pad" />
+                <TextInput placeholder="Devise" style={[styles.input, styles.inlineInput]} value={hotelLeisureInput.pricingUnit || "MAD"} onChangeText={(text) => setHotelLeisureInput((previous) => ({ ...previous, pricingUnit: text.toUpperCase() }))} />
+              </View>
               <TouchableOpacity style={styles.inlineAddButton} onPress={addOrUpdateHotelLeisure}><Text style={styles.inlineAddButtonText}>{editingHotelLeisureIndex === null ? "Ajouter loisir" : "Modifier loisir"}</Text></TouchableOpacity>
               {hotelLeisure.map((item, index) => (
                 <View key={`${item.name}-${index}`} style={styles.inlineCardSimple}>
-                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.count} - {item.surface}</Text>
+                  <Text style={styles.inlineCardText}>{item.name} - {item.type} - {item.count} - {item.surface}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}</Text>
                   <View style={styles.inlineActionsRow}>
                     <TouchableOpacity onPress={() => { setHotelLeisureInput(item); setEditingHotelLeisureIndex(index); }}><Text style={styles.inlineActionEdit}>Modifier</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setHotelLeisure((previous) => previous.filter((_, i) => i !== index))}><Text style={styles.inlineActionDelete}>Supprimer</Text></TouchableOpacity>
@@ -5063,6 +5312,14 @@ const styles = StyleSheet.create({
     color: AppColors.ui.text,
     fontSize: 12,
     marginBottom: 2,
+  },
+
+  inlineHintText: {
+    color: AppColors.gray.dark,
+    fontSize: 11,
+    marginTop: -2,
+    marginBottom: 10,
+    lineHeight: 16,
   },
 
   inlineActionsRow: {
