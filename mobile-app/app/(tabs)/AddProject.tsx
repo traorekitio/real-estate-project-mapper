@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import MapView, { Marker } from "@/components/ui/MapViewWrapper";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { OpenLocationCode } from "open-location-code";
@@ -1002,6 +1003,7 @@ export default function AddProjectScreen() {
   const [locationQuery, setLocationQuery] = useState("");
   const [locationResults, setLocationResults] = useState<any[]>([]);
   const [loadingLocationSearch, setLoadingLocationSearch] = useState(false);
+  const [isGettingCurrentLocation, setIsGettingCurrentLocation] = useState(false);
   const [selectedLocationLabel, setSelectedLocationLabel] = useState("");
 
   // --- Densité ---
@@ -2617,6 +2619,97 @@ export default function AddProjectScreen() {
 
     if (mapRef.current && typeof mapRef.current.animateToRegion === "function") {
       mapRef.current.animateToRegion(newRegion, 600);
+    }
+  };
+
+  const useCurrentLocation = async () => {
+    setIsGettingCurrentLocation(true);
+    try {
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        showNotice({
+          type: "warning",
+          title: "Localisation désactivée",
+          message: "Activez la localisation du téléphone puis réessayez.",
+          primaryLabel: "OK",
+        });
+        return;
+      }
+
+      let permission = await Location.getForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        permission = await Location.requestForegroundPermissionsAsync();
+      }
+
+      if (permission.status !== "granted") {
+        showNotice({
+          type: "warning",
+          title: "Permission requise",
+          message: "Autorisez l'accès à la localisation pour utiliser votre position actuelle.",
+          primaryLabel: "OK",
+        });
+        return;
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Platform.OS === "android" ? Location.Accuracy.Balanced : Location.Accuracy.High,
+      });
+
+      const latitudeResult = position.coords.latitude;
+      const longitudeResult = position.coords.longitude;
+
+      const newRegion = {
+        latitude: latitudeResult,
+        longitude: longitudeResult,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+
+      setLatitude(latitudeResult);
+      setLongitude(longitudeResult);
+      setMapRegion(newRegion);
+      setLocationResults([]);
+
+      let locationLabel = `Ma position actuelle (${latitudeResult.toFixed(6)}, ${longitudeResult.toFixed(6)})`;
+      const reverseGeo = await Location.reverseGeocodeAsync({
+        latitude: latitudeResult,
+        longitude: longitudeResult,
+      });
+
+      if (reverseGeo.length > 0) {
+        const firstResult = reverseGeo[0];
+        const labelParts = [
+          firstResult.name,
+          firstResult.street,
+          firstResult.city,
+          firstResult.region,
+          firstResult.country,
+        ].filter(Boolean);
+
+        if (labelParts.length > 0) {
+          locationLabel = labelParts.join(", ");
+        }
+
+        if (!city && firstResult.city) {
+          setCity(firstResult.city);
+        }
+      }
+
+      setSelectedLocationLabel(locationLabel);
+
+      if (mapRef.current && typeof mapRef.current.animateToRegion === "function") {
+        mapRef.current.animateToRegion(newRegion, 600);
+      }
+    } catch (error) {
+      console.error("Current location error", error);
+      showNotice({
+        type: "error",
+        title: "Erreur localisation",
+        message: "Impossible de récupérer votre position actuelle.",
+        primaryLabel: "Fermer",
+      });
+    } finally {
+      setIsGettingCurrentLocation(false);
     }
   };
 
@@ -5027,6 +5120,16 @@ const convertToM2ForDatabase = (value: string, unit: "m²" | "ha"): number | nul
               </Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.locationCurrentButton}
+              onPress={useCurrentLocation}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.locationCurrentButtonText}>
+                {isGettingCurrentLocation ? "Récupération..." : "Utiliser ma position actuelle"}
+              </Text>
+            </TouchableOpacity>
+
             {selectedLocationLabel ? (
               <Text style={styles.selectedLocationText} numberOfLines={2}>
                 Localisation sélectionnée : {selectedLocationLabel}
@@ -5544,6 +5647,24 @@ const styles = StyleSheet.create({
   locationSearchButtonText: {
     color: AppColors.ui.background,
     fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  locationCurrentButton: {
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: AppColors.primary.main,
+    backgroundColor: AppColors.ui.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  locationCurrentButtonText: {
+    color: AppColors.primary.main,
+    fontSize: 15,
     fontWeight: "700",
     fontFamily: "Century Gothic",
   },

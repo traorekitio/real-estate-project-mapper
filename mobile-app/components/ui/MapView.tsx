@@ -1160,14 +1160,22 @@ export default function MapScreen({
       );
 
       const selectedProjects = filteredProjects
-        .map((project, index) => ({
-          index: index + 1,
-          name: project.name,
-          point: mapExportApi.latLngToContainerPoint({
-            latitude: project.latitude,
-            longitude: project.longitude,
-          }),
-        }))
+        .map((project, index) => {
+          const primaryType = getPrimaryFilterType(project.project_type);
+          const colorHex = rgbToHex(filterTypeColors[primaryType] || markerColor).replace("#", "");
+
+          return {
+            index: index + 1,
+            id: project.id,
+            name: project.name,
+            primaryType,
+            markerColor: colorHex,
+            point: mapExportApi.latLngToContainerPoint({
+              latitude: project.latitude,
+              longitude: project.longitude,
+            }),
+          };
+        })
         .filter(({ point }) => (
           point.x >= selectionRect.x &&
           point.x <= selectionRect.x + selectionRect.width &&
@@ -1188,7 +1196,6 @@ export default function MapScreen({
       const pptx = new PptxGenJS();
       pptx.layout = "LAYOUT_WIDE";
 
-      const markerFillColor = rgbToHex(markerColor).replace("#", "");
       const markerStrokeColor = rgbToHex(markerBorderColor).replace("#", "");
       const mapSlide = pptx.addSlide();
       await addSlideChrome(mapSlide, "OFFRE ACTUELLE - MAPPING", "Page1");
@@ -1218,7 +1225,7 @@ export default function MapScreen({
         h: imageHeight,
       });
 
-      selectedProjects.forEach(({ index, point }) => {
+      selectedProjects.forEach(({ index, point, markerColor: projectMarkerColor }) => {
         const relativeX = (point.x - selectionRect.x) / selectionRect.width;
         const relativeY = (point.y - selectionRect.y) / selectionRect.height;
         const markerDiameter = Math.max((markerSize / selectionRect.width) * imageWidth, 0.18);
@@ -1230,7 +1237,7 @@ export default function MapScreen({
           y: markerY,
           w: markerDiameter,
           h: markerDiameter,
-          fill: { color: markerFillColor },
+          fill: { color: projectMarkerColor },
           line: { color: markerStrokeColor, width: 1.1 },
         });
 
@@ -1249,10 +1256,60 @@ export default function MapScreen({
         });
       });
 
+      const groupedLegend = FILTER_TYPES
+        .map((type) => {
+          const items = selectedProjects.filter((project) => project.primaryType === type);
+          if (items.length === 0) return null;
+          const color = rgbToHex(filterTypeColors[type] || markerColor).replace("#", "");
+          return { type, color, items };
+        })
+        .filter((group): group is { type: FilterType; color: string; items: typeof selectedProjects } => group !== null);
+
+      const compactLegendX = 0.18;
+      const compactLegendY = 1.52;
+      const compactLegendW = 2.28;
+      const compactLegendH = Math.min(0.56 + groupedLegend.length * 0.24, 2.35);
+
+      mapSlide.addShape(pptx.ShapeType.roundRect, {
+        x: compactLegendX,
+        y: compactLegendY,
+        w: compactLegendW,
+        h: compactLegendH,
+        rectRadius: 0.06,
+        fill: { color: "FFFFFF", transparency: 4 },
+        line: { color: "4E7F8C", width: 1 },
+      });
+
+      groupedLegend.forEach((group, groupIndex) => {
+        const rowY = compactLegendY + 0.17 + groupIndex * 0.24;
+
+        mapSlide.addShape(pptx.ShapeType.ellipse, {
+          x: compactLegendX + 0.12,
+          y: rowY,
+          w: 0.14,
+          h: 0.14,
+          fill: { color: group.color },
+          line: { color: markerStrokeColor, width: 0.8 },
+        });
+
+        mapSlide.addText(group.type, {
+          x: compactLegendX + 0.34,
+          y: rowY - 0.01,
+          w: compactLegendW - 0.44,
+          h: 0.16,
+          fontFace: "Century Gothic",
+          fontSize: 8.5,
+          color: "1C1C1C",
+          bold: true,
+          margin: 0,
+          breakLine: false,
+          fit: "shrink",
+        });
+      });
+
       const legendSlide = pptx.addSlide();
       await addSlideChrome(legendSlide, "OFFRE ACTUELLE - LÉGENDE", "Page2");
 
-      const [leftColumnProjects, rightColumnProjects] = splitProjectsIntoColumns(selectedProjects);
       const legendBoxX = 3.38;
       const legendBoxY = 1.55;
       const legendBoxW = 6.42;
@@ -1271,8 +1328,8 @@ export default function MapScreen({
         y: legendBoxY,
         w: legendBoxW,
         h: 0.23,
-        fill: { color: markerFillColor },
-        line: { color: markerFillColor, width: 0 },
+        fill: { color: "31849B" },
+        line: { color: "31849B", width: 0 },
       });
       legendSlide.addText("LÉGENDE", {
         x: legendBoxX,
@@ -1287,49 +1344,104 @@ export default function MapScreen({
         color: "FFFFFF",
       });
 
-      const renderLegendColumn = (entries: typeof selectedProjects, columnX: number) => {
-        entries.forEach(({ index, name }, entryIndex) => {
-          const itemY = legendBoxY + 0.42 + entryIndex * 0.23;
+      const legendSections = groupedLegend.map((group) => ({
+        type: group.type,
+        color: group.color,
+        entries: group.items,
+      }));
 
-          legendSlide.addShape(pptx.ShapeType.ellipse, {
+      const leftSections: typeof legendSections = [];
+      const rightSections: typeof legendSections = [];
+      let leftUnits = 0;
+      let rightUnits = 0;
+
+      legendSections.forEach((section) => {
+        const sectionUnits = section.entries.length + 1.4;
+        if (leftUnits <= rightUnits) {
+          leftSections.push(section);
+          leftUnits += sectionUnits;
+        } else {
+          rightSections.push(section);
+          rightUnits += sectionUnits;
+        }
+      });
+
+      const renderLegendSections = (
+        sections: typeof legendSections,
+        columnX: number,
+        columnW: number,
+      ) => {
+        let currentY = legendBoxY + 0.36;
+        const maxBottom = legendBoxY + legendBoxH - 0.12;
+
+        for (const section of sections) {
+          if (currentY > maxBottom - 0.2) break;
+
+          legendSlide.addText(section.type.toUpperCase(), {
             x: columnX,
-            y: itemY,
-            w: 0.23,
-            h: 0.23,
-            fill: { color: markerFillColor },
-            line: { color: markerStrokeColor, width: 0.8 },
-          });
-          legendSlide.addText(index.toString(), {
-            x: columnX,
-            y: itemY + 0.005,
-            w: 0.23,
-            h: 0.2,
-            align: "center",
-            valign: "middle",
-            margin: 0,
+            y: currentY,
+            w: columnW,
+            h: 0.17,
             fontFace: "Century Gothic",
-            fontSize: 7,
+            fontSize: 8.5,
             bold: true,
-            color: "FFFFFF",
-          });
-          legendSlide.addText(name, {
-            x: columnX + 0.33,
-            y: itemY + 0.015,
-            w: 2.55,
-            h: 0.18,
-            fontFace: "Century Gothic",
-            fontSize: 9.5,
-            color: "111111",
-            bold: false,
+            color: section.color,
+            underline: { color: section.color, style: "sng" },
             margin: 0,
             breakLine: false,
-            fit: "shrink",
           });
-        });
+
+          currentY += 0.2;
+
+          for (const entry of section.entries) {
+            if (currentY > maxBottom - 0.18) break;
+
+            legendSlide.addShape(pptx.ShapeType.ellipse, {
+              x: columnX,
+              y: currentY,
+              w: 0.22,
+              h: 0.22,
+              fill: { color: section.color },
+              line: { color: markerStrokeColor, width: 0.8 },
+            });
+
+            legendSlide.addText(entry.index.toString(), {
+              x: columnX,
+              y: currentY + 0.005,
+              w: 0.22,
+              h: 0.19,
+              align: "center",
+              valign: "middle",
+              margin: 0,
+              fontFace: "Century Gothic",
+              fontSize: 7,
+              bold: true,
+              color: "FFFFFF",
+            });
+
+            legendSlide.addText(entry.name, {
+              x: columnX + 0.31,
+              y: currentY + 0.015,
+              w: columnW - 0.36,
+              h: 0.18,
+              fontFace: "Century Gothic",
+              fontSize: 9,
+              color: "111111",
+              bold: false,
+              margin: 0,
+              breakLine: false,
+              fit: "shrink",
+            });
+
+            currentY += 0.225;
+          }
+
+          currentY += 0.06;
+        }
       };
 
-      renderLegendColumn(leftColumnProjects, legendBoxX + 0.14);
-      renderLegendColumn(rightColumnProjects, legendBoxX + 3.47);
+      renderLegendSections(leftSections, legendBoxX + 0.14, 2.95);
+      renderLegendSections(rightSections, legendBoxX + 3.34, 2.95);
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       await pptx.writeFile({ fileName: `mapping-export-${timestamp}.pptx` });
@@ -1346,7 +1458,7 @@ export default function MapScreen({
     } finally {
       setIsExporting(false);
     }
-  }, [filteredProjects, mapExportApi, markerBorderColor, markerColor, markerSize, markerTextSize, resetSelectionMode, selectionRect, showNotice]);
+  }, [filterTypeColors, filteredProjects, mapExportApi, markerBorderColor, markerColor, markerSize, markerTextSize, resetSelectionMode, selectionRect, showNotice]);
 
   return (
     <View style={styles.container}>
