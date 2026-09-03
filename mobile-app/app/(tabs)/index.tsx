@@ -39,6 +39,13 @@ type Stats = {
   villaProjects: number;
   lotProjects: number;
   retailProjects: number;
+  bureauProjects: number;
+  santeProjects: number;
+  hotelProjects: number;
+  loisirProjects: number;
+  sportProjects: number;
+  educationProjects: number;
+  artCultureProjects: number;
 };
 
 const SIDEBAR_WIDTH = 88;
@@ -51,6 +58,13 @@ export default function HomeScreen() {
     villaProjects: 0,
     lotProjects: 0,
     retailProjects: 0,
+    bureauProjects: 0,
+    santeProjects: 0,
+    hotelProjects: 0,
+    loisirProjects: 0,
+    sportProjects: 0,
+    educationProjects: 0,
+    artCultureProjects: 0,
   });
 
   const fetchStats = async () => {
@@ -64,6 +78,16 @@ export default function HomeScreen() {
       villaProjects: data.filter((p: any) => p.project_type?.includes("Villa")).length,
       lotProjects: data.filter((p: any) => p.project_type?.includes("Lot")).length,
       retailProjects: data.filter((p: any) => p.project_type?.includes("Retail")).length,
+      bureauProjects: data.filter((p: any) => p.project_type?.includes("Bureau")).length,
+      santeProjects: data.filter((p: any) => {
+        const type = (p.project_type || "").toLowerCase();
+        return type.includes("sante") || type.includes("santé");
+      }).length,
+      hotelProjects: data.filter((p: any) => p.project_type?.includes("Hotel") || p.project_type?.includes("Hôtel")).length,
+      loisirProjects: data.filter((p: any) => p.project_type?.includes("Loisir")).length,
+      sportProjects: data.filter((p: any) => p.project_type?.includes("Sport")).length,
+      educationProjects: data.filter((p: any) => p.project_type?.includes("Education")).length,
+      artCultureProjects: data.filter((p: any) => p.project_type?.includes("Art et culture")).length,
     });
   };
 
@@ -79,6 +103,19 @@ export default function HomeScreen() {
   }, [stats.totalProjects]);
 
   const isCompact = Dimensions.get("window").width < 940;
+  const overviewStats = [
+    { icon: "🏢", value: stats.collectifProjects, label: "Collectif" },
+    { icon: "🏡", value: stats.villaProjects, label: "Villa" },
+    { icon: "🏘", value: stats.lotProjects, label: "Lots" },
+    { icon: "🛍", value: stats.retailProjects, label: "Retail" },
+    { icon: "🏬", value: stats.bureauProjects, label: "Bureau" },
+    { icon: "🩺", value: stats.santeProjects, label: "Sante" },
+    { icon: "🏨", value: stats.hotelProjects, label: "Hotel" },
+    { icon: "🎯", value: stats.loisirProjects, label: "Loisir" },
+    { icon: "⚽", value: stats.sportProjects, label: "Sport" },
+    { icon: "🎓", value: stats.educationProjects, label: "Education" },
+    { icon: "🎭", value: stats.artCultureProjects, label: "Art et culture" },
+  ];
 
   return (
     <View style={styles.screen}>
@@ -172,11 +209,11 @@ export default function HomeScreen() {
               </View>
               <Text style={styles.progressText}>{Math.round(progress)}%</Text>
             </View>
-
-            <StatMini icon="🏢" value={stats.collectifProjects} label="Collectif" />
-            <StatMini icon="🏡" value={stats.villaProjects} label="Villa" />
-            <StatMini icon="🏘" value={stats.lotProjects} label="Lots" />
-            <StatMini icon="🛍" value={stats.retailProjects} label="Retail" />
+            <View style={styles.overviewStatsWrap}>
+              {overviewStats.map((item) => (
+                <StatMini key={item.label} icon={item.icon} value={item.value} label={item.label} />
+              ))}
+            </View>
           </View>
         </View>
 
@@ -641,6 +678,12 @@ const styles = StyleSheet.create({
     paddingRight: 10,
     justifyContent: "center",
   },
+  overviewStatsWrap: {
+    flex: 1.8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
   overviewBigNumber: {
     color: "#1094B7",
     fontSize: 52,
@@ -675,7 +718,7 @@ const styles = StyleSheet.create({
     fontFamily: "Century Gothic",
   },
   statMiniCard: {
-    flex: 1,
+    width: "31%",
     minWidth: 102,
     borderRadius: 12,
     borderWidth: 1,
