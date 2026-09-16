@@ -109,8 +109,8 @@ const projectMixedTypes = [
 
 const typologiesOptions = {
   Collectif: ["F2", "F3", "F4", "F5", "F6"],
-  Villa: ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
-  "Lot de villas": ["Villa Jumelee", "Villa Individuelle", "Villa en Bande"],
+  Villa: ["Villa Jumelee", "villa isolée", "Villa en Bande"],
+  "Lot de villas": ["Villa Jumelee", "villa isolée", "Villa en Bande"],
 };
 
 const countryOptions = ["Maroc", "Sénégal", "Côte d'Ivoire", "Cameroun", "Tunisie", "Algérie", "France", "Espagne", "Portugal", "UAE", "USA", "Autre"];

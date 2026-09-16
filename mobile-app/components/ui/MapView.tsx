@@ -94,6 +94,34 @@ type ProjectMediaItem = {
   caption?: string;
 };
 
+const explorerIcons = {
+  businessModel: require("../../assets/images/explorer/icone-business model.png"),
+  characteristic: require("../../assets/images/explorer/icone-caracteristique.png"),
+  collectif: require("../../assets/images/explorer/icone-collectif.png"),
+  component: require("../../assets/images/explorer/icone-composante.png"),
+  deliveryDate: require("../../assets/images/explorer/icone-date livraison.png"),
+  density: require("../../assets/images/explorer/icone-densite.png"),
+  developer: require("../../assets/images/explorer/icone-developpeur.png"),
+  documents: require("../../assets/images/explorer/icone-documents disponibles.png"),
+  star: require("../../assets/images/explorer/icone-etoile.png"),
+  fx: require("../../assets/images/explorer/icone-Fx.png"),
+  priceRange: require("../../assets/images/explorer/icone-gamme de prix.png"),
+  globalPriceRange: require("../../assets/images/explorer/icone-gamme prix globale.png"),
+  localisation: require("../../assets/images/explorer/icone-localisation.png"),
+  totalUnits: require("../../assets/images/explorer/icone-nombre total unite.png"),
+  note: require("../../assets/images/explorer/icone-note.png"),
+  openSource: require("../../assets/images/explorer/icone-ouvrir source.png"),
+  source: require("../../assets/images/explorer/icone-source.png"),
+  standing: require("../../assets/images/explorer/icone-standing cible.png"),
+  status: require("../../assets/images/explorer/icone-statut.png"),
+  surface: require("../../assets/images/explorer/icone-surface fonciere.png"),
+  commercializationRate: require("../../assets/images/explorer/icone-taux commercialisation.png"),
+  salesVelocity: require("../../assets/images/explorer/icone-taux ecoulement.png"),
+  download: require("../../assets/images/explorer/icone-telecharger.png"),
+  unitsPrice: require("../../assets/images/explorer/icone-unite prix.png"),
+  unitsRemaining: require("../../assets/images/explorer/icone-unite restante.png"),
+} as const;
+
 type ExtendedRetailDetails = {
   typology?: string;
   niveaux?: string;
@@ -163,6 +191,8 @@ type ExtendedHotelDetails = {
 
 type ExtendedSportDetails = {
   subtype?: string;
+  creationDate?: string;
+  openingDate?: string;
   renovationDate?: string;
   capacity?: string;
   positioning?: string;
@@ -190,6 +220,8 @@ type ExtendedSportDetails = {
 
 type ExtendedEducationDetails = {
   subtype?: string;
+  creationDate?: string;
+  openingDate?: string;
   renovationDate?: string;
   capacity?: string;
   students?: string;
@@ -217,6 +249,8 @@ type ExtendedEducationDetails = {
 
 type ExtendedArtCultureDetails = {
   subtype?: string;
+  creationDate?: string;
+  openingDate?: string;
   renovationDate?: string;
   operator?: string;
   capacity?: string;
@@ -246,6 +280,8 @@ type ExtendedArtCultureDetails = {
 type ExtendedLeisureDetails = {
   subtype?: string;
   builtSurface?: string;
+  creationDate?: string;
+  openingDate?: string;
   renovationDate?: string;
   capacity?: string;
   annualVisitors?: string;
@@ -536,6 +572,11 @@ export default function MapScreen({
   const [projectRetail, setProjectRetail] = useState<RetailInfo | null>(null);
   const [projectMedia, setProjectMedia] = useState<ProjectMediaItem[]>([]);
   const [projectExtendedDetails, setProjectExtendedDetails] = useState<ProjectExtendedDetails | null>(null);
+  const [activeProjectTab, setActiveProjectTab] = useState<"overview" | "characteristics" | "components" | "units" | "commercialization" | "documents">("overview");
+  const [activeProjectMediaIndex, setActiveProjectMediaIndex] = useState(0);
+  const projectDetailSectionKeys = ["overview", "characteristics", "components", "units", "commercialization", "documents"] as const;
+  const projectDetailScrollRef = useRef<ScrollView | null>(null);
+  const projectDetailSectionOffsets = useRef<Record<string, number>>({});
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [activeFilters, setActiveFilters] = useState<FilterType[]>([...FILTER_TYPES]);
   const [selectedCityFilter, setSelectedCityFilter] = useState<string | null>(null);
@@ -647,8 +688,13 @@ export default function MapScreen({
 
   const handleMarkerPress = async (project: Project) => {
     setSelectedProject(project);
+    setActiveProjectTab("overview");
+    projectDetailSectionOffsets.current = {};
     setProjectMedia([]);
     setProjectExtendedDetails(null);
+    if (projectDetailScrollRef.current) {
+      projectDetailScrollRef.current.scrollTo({ y: 0, animated: false });
+    }
     await Promise.all([
       fetchProjectTypologies(project.id),
       fetchProjectDensity(project.id),
@@ -657,6 +703,33 @@ export default function MapScreen({
       fetchProjectExtendedDetails(project.id),
     ]);
   };
+
+  const syncCollectiveDetailTabFromScroll = useCallback((offsetY: number) => {
+    const threshold = 120;
+    let nextTab: typeof activeProjectTab = "overview";
+
+    for (const tabKey of projectDetailSectionKeys) {
+      const sectionTop = projectDetailSectionOffsets.current[tabKey];
+      if (sectionTop != null && offsetY + threshold >= sectionTop) {
+        nextTab = tabKey;
+      }
+    }
+
+    setActiveProjectTab((current) => (current === nextTab ? current : nextTab));
+  }, [activeProjectTab]);
+
+  const handleCollectiveTabPress = useCallback((tabKey: typeof projectDetailSectionKeys[number]) => {
+    setActiveProjectTab(tabKey);
+    const targetOffset = projectDetailSectionOffsets.current[tabKey];
+    if (targetOffset == null || !projectDetailScrollRef.current) {
+      return;
+    }
+
+    projectDetailScrollRef.current.scrollTo({
+      y: Math.max(0, targetOffset - 12),
+      animated: true,
+    });
+  }, []);
 
   const filterTypeColors = useMemo(
     () => ({
@@ -908,6 +981,24 @@ export default function MapScreen({
     return unit ? `${formatted} ${unit}` : formatted;
   };
 
+  const getMinHabitableSurface = (typology: Typology) => {
+    if (typology.surface_habitable_min != null) {
+      return typology.surface_habitable_min;
+    }
+    return null;
+  };
+
+  const getTypologyPricePerSquareMeter = (typology: Typology) => {
+    const priceMin = typology.pricing_min;
+    const habitableMin = getMinHabitableSurface(typology);
+
+    if (priceMin == null || habitableMin == null || habitableMin <= 0) {
+      return null;
+    }
+
+    return Math.round(priceMin / habitableMin);
+  };
+
   const getTypologyPriceLabel = (typology: Typology) => {
     if (typology.pricing_type === "between" && typology.pricing_min != null && typology.pricing_max != null) {
       return `Entre ${formatNumericPrice(typology.pricing_min, typology.pricing_unit)} et ${formatNumericPrice(typology.pricing_max, typology.pricing_unit)}`;
@@ -960,6 +1051,1265 @@ export default function MapScreen({
       .join(" • ");
   };
 
+  const renderActiveProjectTabContent = () => {
+    if (!selectedProject) {
+      return null;
+    }
+
+    const galleryImages = projectMedia.length > 0
+      ? projectMedia.map((item) => item.media_url).filter(Boolean)
+      : ["https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80"];
+    const currentGalleryImage = galleryImages[activeProjectMediaIndex] || galleryImages[0];
+    const amenities = [...new Set([...(selectedProject.amenities || []), ...(selectedProject.project_components || [])])];
+
+    const overviewCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Standing / Cible", value: selectedProject.standing_cible || "Moyen de gamme +", icon: "standing" },
+      { label: "Statut", value: selectedProject.status || "En cours de livraison/construction", icon: "status" },
+      { label: "Localisation", value: [selectedProject.country, selectedProject.city, selectedProject.quartier].filter(Boolean).join(", ") || "Maroc, Casablanca, CFC", icon: "localisation" },
+      { label: "Développeur", value: selectedProject.developer || "Valoris group", icon: "developer" },
+      { label: "Business model", value: selectedProject.business_model || "Vente", icon: "businessModel" },
+    ];
+
+    const characteristicMetrics = [
+      { label: "Surface foncière totale", value: selectedProject.surface_fonciere_totale ? `${selectedProject.surface_fonciere_totale.toLocaleString()} m²` : "N/A" },
+      { label: "Nombre total d’unités", value: selectedProject.total_units ? `${selectedProject.total_units.toLocaleString()} unités` : "N/A" },
+      { label: "Date de livraison", value: selectedProject.delivery_date || "N/A" },
+      { label: "Densité", value: projectDensity.length > 0 ? projectDensity.map((density) => `${density.density_value}${getDensityUnit(selectedProject.project_type, density.density_type) || ""}`).join(" • ") : "N/A" },
+    ];
+
+    const commercializationCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Taux de commercialisation global", value: selectedProject.commercialization_rate_global != null ? `${selectedProject.commercialization_rate_global}%` : "N/A", icon: "commercializationRate" },
+      { label: "Taux d’écoulement global", value: selectedProject.sales_velocity_global != null ? `${selectedProject.sales_velocity_global} unités/mois` : "N/A", icon: "salesVelocity" },
+      { label: "Unités restantes", value: selectedProject.units_remaining_global != null ? `${selectedProject.units_remaining_global.toLocaleString()} unités` : "N/A", icon: "unitsRemaining" },
+      { label: "Gamme de prix", value: projectTypologies.length > 0 ? getPriceRangeText(projectTypologies) : "N/A", icon: "priceRange" },
+    ];
+
+    const documentRows = projectMedia.length > 0
+      ? projectMedia.map((item, index) => ({
+          id: item.id,
+          title: item.caption || `Document ${index + 1}`,
+          format: item.media_type || "Document",
+          url: item.media_url,
+        }))
+      : [
+          { id: "no-doc", title: "Aucun document disponible", format: "—", url: "" },
+        ];
+
+    const tabButtons = [
+      { key: "overview", label: "Vue d’ensemble", icon: "▣" },
+      { key: "characteristics", label: "Caractéristiques", icon: "▤" },
+      { key: "components", label: "Équipements", icon: "◫" },
+      { key: "units", label: "Unités & Prix", icon: "▥" },
+      { key: "commercialization", label: "Commercialisation", icon: "▌" },
+      { key: "documents", label: "Documents & Source", icon: "□" },
+    ] as const;
+
+    const renderTabButton = (tabKey: typeof tabButtons[number]["key"]) => {
+      const isActive = activeProjectTab === tabKey;
+      const tab = tabButtons.find((item) => item.key === tabKey);
+      return (
+        <TouchableOpacity
+          key={tabKey}
+          style={[styles.projectTabButton, isActive && styles.projectTabButtonActive]}
+          onPress={() => setActiveProjectTab(tabKey)}
+          activeOpacity={0.9}
+        >
+          <View style={styles.projectTabIconSlot}>
+            <Text style={[styles.projectTabIcon, isActive && styles.projectTabIconActive]}>{tab?.icon || "▣"}</Text>
+          </View>
+          <Text style={[styles.projectTabText, isActive && styles.projectTabTextActive]}>{tab?.label}</Text>
+        </TouchableOpacity>
+      );
+    };
+
+    const renderCardGrid = (items: { label: string; value: string; icon?: keyof typeof explorerIcons }[]) => (
+      <View style={styles.projectOverviewGrid}>
+        {items.map((item, index) => (
+          <View key={`${item.label}-${index}`} style={styles.projectOverviewCard}>
+            <View style={styles.projectOverviewCardIconWrap}>
+              <Image source={explorerIcons[item.icon || "component"]} style={styles.explorerIcon} resizeMode="contain" />
+            </View>
+            <View style={styles.projectOverviewCardContent}>
+              <Text style={styles.projectOverviewCardLabel}>{item.label}</Text>
+              <Text style={styles.projectOverviewCardValue}>{item.value}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+
+    const hotelDetails = projectExtendedDetails?.hotel;
+    const retailDetails = projectExtendedDetails?.retail;
+    const officeDetails = projectExtendedDetails?.office;
+    const artCultureDetails = projectExtendedDetails?.artCulture;
+    const isHotelProject = (selectedProject.project_type || "").toLowerCase().includes("hotel") || (selectedProject.project_type || "").toLowerCase().includes("hôtel");
+    const isRetailProject = (selectedProject.project_type || "").toLowerCase().includes("retail");
+    const isOfficeProject = (selectedProject.project_type || "").toLowerCase().includes("bureau") || (selectedProject.project_type || "").toLowerCase().includes("office");
+    const isArtCultureProject = (selectedProject.project_type || "").toLowerCase().includes("art et culture");
+    const splitTextList = (value?: string) => {
+      if (!value) return [];
+      return value
+        .split(/[,;|•]/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    };
+    const hotelRooms = Array.isArray(hotelDetails?.rooms) ? hotelDetails.rooms.filter((room) => room && typeof room === "object") : [];
+    const hotelFnb = Array.isArray(hotelDetails?.fnb) ? hotelDetails.fnb.filter((item) => item && typeof item === "object") : [];
+    const hotelMice = Array.isArray(hotelDetails?.mice) ? hotelDetails.mice.filter((item) => item && typeof item === "object") : [];
+    const hotelLeisure = Array.isArray(hotelDetails?.leisure) ? hotelDetails.leisure.filter((item) => item && typeof item === "object") : [];
+    const hotelRoomCountTotal = hotelRooms.reduce((sum, room) => {
+      const parsed = Number(String(room.count ?? "").replace(/[^0-9.]/g, ""));
+      return sum + (Number.isFinite(parsed) ? parsed : 0);
+    }, 0);
+    const hotelMinNightPrice = hotelRooms
+      .map((room) => Number(String(room.pricePerNight ?? "").replace(/[^0-9.]/g, "")))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .reduce((min, value) => (value < min ? value : min), Number.POSITIVE_INFINITY);
+    const hotelMaxNightPrice = hotelRooms
+      .map((room) => Number(String(room.pricePerNight ?? "").replace(/[^0-9.]/g, "")))
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .reduce((max, value) => (value > max ? value : max), Number.NEGATIVE_INFINITY);
+
+    const hotelOverviewCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Sous-type", value: hotelDetails?.subtype || "Hôtel", icon: "collectif" },
+      { label: "Catégorie", value: hotelDetails?.category || "Non renseignée", icon: "star" },
+      { label: "Nombre de clés", value: hotelDetails?.keys ? `${hotelDetails.keys.toLocaleString()} clés` : "N/A", icon: "totalUnits" },
+      { label: "Nombre d’étages", value: hotelDetails?.floors ? `${hotelDetails.floors.toLocaleString()} étages` : "N/A", icon: "density" },
+      { label: "Opérateur", value: hotelDetails?.operator || "N/A", icon: "developer" },
+    ];
+
+    const hotelCharacteristics = [
+      { label: "Surface foncière totale", value: selectedProject.surface_fonciere_totale ? `${selectedProject.surface_fonciere_totale.toLocaleString()} m²` : "N/A" },
+      { label: "Nombre de chambres", value: hotelRoomCountTotal > 0 ? `${hotelRoomCountTotal.toLocaleString()} chambres` : "N/A" },
+      { label: "Date d’ouverture", value: hotelDetails?.openingDate || "N/A" },
+      { label: "Date de rénovation", value: hotelDetails?.renovationDate || "N/A" },
+    ];
+
+    const hotelCommercializationCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Note Booking", value: hotelDetails?.bookingNote || "N/A", icon: "commercializationRate" },
+      { label: "Investisseur / Propriétaire", value: hotelDetails?.investor || "N/A", icon: "developer" },
+      { label: "Gestionnaire", value: hotelDetails?.manager || "N/A", icon: "status" },
+      { label: "Mix services", value: `${hotelFnb.length} F&B • ${hotelMice.length} MICE • ${hotelLeisure.length} Loisirs`, icon: "component" },
+      { label: "Gamme de prix / nuit", value: hotelMinNightPrice !== Number.POSITIVE_INFINITY && hotelMaxNightPrice !== Number.NEGATIVE_INFINITY
+        ? `${hotelMinNightPrice.toLocaleString()} - ${hotelMaxNightPrice.toLocaleString()} MAD`
+        : "N/A", icon: "priceRange" },
+    ];
+
+    const retailOverviewCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Typologie retail", value: retailDetails?.typology || "N/A", icon: "collectif" },
+      { label: "Positionnement", value: projectRetail?.positionnement || "N/A", icon: "standing" },
+      { label: "GLA", value: projectRetail?.gla != null ? `${projectRetail.gla.toLocaleString()} m²` : "N/A", icon: "surface" },
+      { label: "Niveaux", value: retailDetails?.niveaux || "N/A", icon: "density" },
+      { label: "Mix retail", value: projectRetail?.mix_retail || "N/A", icon: "component" },
+    ];
+
+    const retailCharacteristicsRows = [
+      { label: "Date d'ouverture", value: projectRetail?.opening_date || "N/A" },
+      { label: "Parking places", value: retailDetails?.parkingPlaces || "N/A" },
+      { label: "Type de parking", value: retailDetails?.parkingType || "N/A" },
+      { label: "Parking ratio", value: retailDetails?.parkingRatio || "N/A" },
+      { label: "Taux d'occupation", value: retailDetails?.occupancyRate || "N/A" },
+      { label: "Locataires principaux", value: retailDetails?.mainTenants || "N/A" },
+    ];
+
+    const officeSpaces = Array.isArray(officeDetails?.spaces)
+      ? officeDetails!.spaces.filter((space) => space && (space.space || space.description || space.pricingMin || space.pricingMax))
+      : [];
+
+    const officeOverviewCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Type de bureau", value: officeDetails?.officeType || "N/A", icon: "collectif" },
+      { label: "Concept", value: officeDetails?.concept || "N/A", icon: "component" },
+      { label: "Cible", value: officeDetails?.target || "N/A", icon: "standing" },
+      { label: "Services", value: officeDetails?.services || "N/A", icon: "documents" },
+      { label: "Espaces de travail", value: `${officeSpaces.length} espace(s)`, icon: "totalUnits" },
+    ];
+
+    const officeCharacteristicsRows = [
+      { label: "Date d'ouverture", value: officeDetails?.openingDate || "N/A" },
+      { label: "Surface foncière totale", value: selectedProject.surface_fonciere_totale ? `${selectedProject.surface_fonciere_totale.toLocaleString()} m²` : "N/A" },
+      { label: "Nombre total d’unités", value: selectedProject.total_units ? `${selectedProject.total_units.toLocaleString()} unités` : "N/A" },
+      { label: "Ville", value: selectedProject.city || "N/A" },
+    ];
+
+    const artCultureTargets = [
+      ...(artCultureDetails?.targets || []),
+      ...splitTextList(artCultureDetails?.targetsOther),
+    ].filter(Boolean);
+
+    const artCultureSpaces = Array.isArray(artCultureDetails?.spaceCapacities)
+      ? artCultureDetails!.spaceCapacities.filter((item) => item && (item.name || item.capacity || item.surface))
+      : [];
+
+    const artCultureOverviewCards: Array<{ label: string; value: string; icon?: keyof typeof explorerIcons }> = [
+      { label: "Sous-type", value: artCultureDetails?.subtype || "N/A", icon: "collectif" },
+      { label: "Capacité", value: artCultureDetails?.capacity || "N/A", icon: "totalUnits" },
+      { label: "Public cible", value: artCultureTargets.length > 0 ? artCultureTargets.join(" • ") : "N/A", icon: "standing" },
+      { label: "Positionnement", value: artCultureDetails?.positioning || "N/A", icon: "status" },
+      { label: "Typologie d'espaces", value: `${artCultureSpaces.length} espace(s)`, icon: "component" },
+    ];
+
+    const artCultureCharacteristicRows = [
+      { label: "Date de création", value: artCultureDetails?.creationDate || "N/A" },
+      { label: "Date de rénovation", value: artCultureDetails?.renovationDate || "N/A" },
+      { label: "Opérateur", value: artCultureDetails?.operator || "N/A" },
+      { label: "Temps forts", value: artCultureDetails?.highlights || "N/A" },
+    ];
+
+    const renderArtCultureCharacteristicsContent = () => {
+      const leftRows = artCultureCharacteristicRows.slice(0, 2);
+      const rightRows = artCultureCharacteristicRows.slice(2, 4);
+
+      return (
+        <View style={styles.projectCharacteristicsContainer}>
+          <View style={styles.projectCharacteristicsHeader}>
+            <View style={styles.projectCharacteristicsTitleIconWrap}>
+              <Image source={explorerIcons.characteristic} style={styles.explorerIconMedium} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectCharacteristicsTitle}>Chiffres clés art & culture</Text>
+          </View>
+
+          <View style={styles.projectCharacteristicsGrid}>
+            <View style={styles.projectCharacteristicsBlock}>
+              {leftRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === leftRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.projectCharacteristicsBlock}>
+              {rightRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === rightRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderArtCultureUnitsContent = () => {
+      return (
+        <View style={styles.projectUnitsSectionContainer}>
+          <View style={styles.projectUnitsTitleRow}>
+            <View style={styles.projectUnitsTitleIconWrap}>
+              <Image source={explorerIcons.unitsPrice} style={styles.projectUnitsSectionIcon} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectUnitsTitle}>Typologie d'espaces</Text>
+          </View>
+
+          {artCultureSpaces.length > 0 ? (
+            <View style={styles.projectTypologyGrid}>
+              {artCultureSpaces.map((space, index) => (
+                <View key={`${space.name || "espace"}-${index}`} style={styles.projectTypologyCard}>
+                  <View style={styles.projectTypologyPlanZone}>
+                    <View style={styles.projectTypologyIconWrap}>
+                      <Image source={explorerIcons.fx} style={styles.projectTypologyIconImage} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectTypologyName}>{space.name || `Espace ${index + 1}`}</Text>
+                  </View>
+
+                  <View style={styles.projectTypologyDivider} />
+
+                  <View style={styles.projectTypologySurfaceZone}>
+                    <Text style={styles.projectTypologyMetaLine}>
+                      <Text style={styles.projectTypologyMetaLabel}>Capacité: </Text>
+                      <Text style={styles.projectTypologyMetaValue}>{space.capacity || "N/A"}</Text>
+                    </Text>
+                  </View>
+
+                  <View style={styles.projectTypologyDivider} />
+
+                  <View style={styles.projectTypologyPriceZone}>
+                    <Text style={styles.projectTypologyPriceLabel}>Surface</Text>
+                    <Text style={styles.projectTypologyPriceValue}>{space.surface ? `${space.surface} m²` : "N/A"}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyStateBox}><Text style={styles.emptyStateText}>Aucune typologie d'espace renseignée.</Text></View>
+          )}
+        </View>
+      );
+    };
+
+    const renderArtCultureSpecificContent = () => (
+      <View>
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.overview = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(artCultureOverviewCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.characteristics = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderArtCultureCharacteristicsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.components = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderComponentsGrid()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.units = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderArtCultureUnitsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.commercialization = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(commercializationCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.documents = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderDocumentsContent()}
+        </View>
+      </View>
+    );
+
+    const renderOfficeCharacteristicsContent = () => {
+      const leftRows = officeCharacteristicsRows.slice(0, 2);
+      const rightRows = officeCharacteristicsRows.slice(2, 4);
+
+      return (
+        <View style={styles.projectCharacteristicsContainer}>
+          <View style={styles.projectCharacteristicsHeader}>
+            <View style={styles.projectCharacteristicsTitleIconWrap}>
+              <Image source={explorerIcons.characteristic} style={styles.explorerIconMedium} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectCharacteristicsTitle}>Chiffres clés bureau</Text>
+          </View>
+
+          <View style={styles.projectCharacteristicsGrid}>
+            <View style={styles.projectCharacteristicsBlock}>
+              {leftRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === leftRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.projectCharacteristicsBlock}>
+              {rightRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === rightRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderOfficeUnitsContent = () => {
+      return (
+        <View style={styles.projectUnitsSectionContainer}>
+          <View style={styles.projectUnitsTitleRow}>
+            <View style={styles.projectUnitsTitleIconWrap}>
+              <Image source={explorerIcons.unitsPrice} style={styles.projectUnitsSectionIcon} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectUnitsTitle}>Espaces de travail</Text>
+          </View>
+
+          {officeSpaces.length > 0 ? (
+            <View style={styles.projectTypologyGrid}>
+              {officeSpaces.map((space, index) => {
+                const pricingLabel = formatOfficeSpacePricing(space as NonNullable<ExtendedOfficeDetails["spaces"]>[number]) || "Prix non renseigné";
+
+                return (
+                  <View key={`${space.space || "espace"}-${index}`} style={styles.projectTypologyCard}>
+                    <View style={styles.projectTypologyPlanZone}>
+                      <View style={styles.projectTypologyIconWrap}>
+                        <Image source={explorerIcons.fx} style={styles.projectTypologyIconImage} resizeMode="contain" />
+                      </View>
+                      <Text style={styles.projectTypologyName}>{space.space || `Espace ${index + 1}`}</Text>
+                    </View>
+
+                    <View style={styles.projectTypologyDivider} />
+
+                    <View style={styles.projectTypologySurfaceZone}>
+                      <Text style={styles.projectTypologyMetaLine}>
+                        <Text style={styles.projectTypologyMetaLabel}>Description: </Text>
+                        <Text style={styles.projectTypologyMetaValue}>{space.description || "N/A"}</Text>
+                      </Text>
+                    </View>
+
+                    <View style={styles.projectTypologyDivider} />
+
+                    <View style={styles.projectTypologyPriceZone}>
+                      <Text style={styles.projectTypologyPriceLabel}>Prix de location</Text>
+                      <Text style={styles.projectTypologyPriceValue}>{pricingLabel}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyStateBox}><Text style={styles.emptyStateText}>Aucun espace de travail renseigné.</Text></View>
+          )}
+        </View>
+      );
+    };
+
+    const renderOfficeSpecificContent = () => (
+      <View>
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.overview = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(officeOverviewCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.characteristics = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderOfficeCharacteristicsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.components = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderComponentsGrid()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.units = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderOfficeUnitsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.commercialization = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(commercializationCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.documents = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderDocumentsContent()}
+        </View>
+      </View>
+    );
+
+    const renderRetailCharacteristicsContent = () => {
+      const leftRows = retailCharacteristicsRows.slice(0, 3);
+      const rightRows = retailCharacteristicsRows.slice(3, 6);
+
+      return (
+        <View style={styles.projectCharacteristicsContainer}>
+          <View style={styles.projectCharacteristicsHeader}>
+            <View style={styles.projectCharacteristicsTitleIconWrap}>
+              <Image source={explorerIcons.characteristic} style={styles.explorerIconMedium} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectCharacteristicsTitle}>Chiffres clés retail</Text>
+          </View>
+
+          <View style={styles.projectCharacteristicsGrid}>
+            <View style={styles.projectCharacteristicsBlock}>
+              {leftRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === leftRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.projectCharacteristicsBlock}>
+              {rightRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === rightRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderRetailComponentsGrid = () => {
+      const shoppingBrands = splitTextList(retailDetails?.shoppingBrands);
+      const servicesBrands = splitTextList(retailDetails?.servicesBrands);
+      const leisureBrands = splitTextList(retailDetails?.leisureBrands);
+      const fnbBrands = splitTextList(retailDetails?.foodBrands);
+
+      const renderBrandList = (title: string, count: string | undefined, items: string[]) => (
+        <View style={styles.projectEquipmentBlock}>
+          <View style={styles.projectEquipmentHeader}>
+            <View style={styles.projectEquipmentIconWrap}>
+              <Image source={explorerIcons.component} style={styles.projectEquipmentTitleIcon} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectEquipmentTitle}>{title} ({count || "0"})</Text>
+          </View>
+
+          <View style={styles.projectComponentGrid}>
+            {(items.length > 0 ? items : ["Aucune enseigne renseignée"]).map((item, index) => (
+              <View key={`${title}-${item}-${index}`} style={styles.projectComponentItem}>
+                <Text style={styles.projectComponentItemText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      );
+
+      return (
+        <View style={styles.projectEquipmentLayout}>
+          {renderBrandList("Shopping", retailDetails?.shoppingCount, shoppingBrands)}
+          {renderBrandList("Services", retailDetails?.servicesCount, servicesBrands)}
+          {renderBrandList("Loisirs", retailDetails?.leisureCount, leisureBrands)}
+          {renderBrandList("F&B", retailDetails?.foodCount, fnbBrands)}
+        </View>
+      );
+    };
+
+    const renderRetailSpecificContent = () => (
+      <View>
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.overview = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(retailOverviewCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.characteristics = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderRetailCharacteristicsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.components = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderRetailComponentsGrid()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.units = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderUnitsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.commercialization = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(commercializationCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.documents = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderDocumentsContent()}
+        </View>
+      </View>
+    );
+
+    const renderHotelCharacteristicsContent = () => {
+      const leftRows = hotelCharacteristics.slice(0, 2);
+      const rightRows = hotelCharacteristics.slice(2, 4);
+
+      return (
+        <View style={styles.projectCharacteristicsContainer}>
+          <View style={styles.projectCharacteristicsHeader}>
+            <View style={styles.projectCharacteristicsTitleIconWrap}>
+              <Image source={explorerIcons.characteristic} style={styles.explorerIconMedium} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectCharacteristicsTitle}>Chiffres clés</Text>
+          </View>
+
+          <View style={styles.projectCharacteristicsGrid}>
+            <View style={styles.projectCharacteristicsBlock}>
+              {leftRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === leftRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.projectCharacteristicsBlock}>
+              {rightRows.map((row, index) => (
+                <View key={row.label} style={[styles.projectCharacteristicsRow, index === rightRows.length - 1 && styles.projectCharacteristicsRowLast]}>
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons.characteristic} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderHotelComponentsGrid = () => {
+      const fnbList = hotelFnb.length > 0 ? hotelFnb : [{ name: "Aucune restauration renseignée", type: "—", capacity: "—", pricingAmount: "", pricingUnit: "MAD" }];
+      const miceList = hotelMice.length > 0 ? hotelMice : [{ name: "Aucun MICE renseigné", type: "—", roomsCount: "—", capacity: "—", surface: "—", pricingAmount: "", pricingUnit: "MAD" }];
+      const leisureList = hotelLeisure.length > 0 ? hotelLeisure : [{ name: "Aucun loisir renseigné", type: "—", count: "—", surface: "—", capacity: "—", pricingAmount: "", pricingUnit: "MAD" }];
+
+      return (
+        <View style={styles.projectEquipmentLayout}>
+          <View style={styles.projectEquipmentBlock}>
+            <View style={styles.projectEquipmentHeader}>
+              <View style={styles.projectEquipmentIconWrap}>
+                <Image source={explorerIcons.component} style={styles.projectEquipmentTitleIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectEquipmentTitle}>Restauration (F&B)</Text>
+            </View>
+
+            <View style={styles.projectComponentGrid}>
+              {fnbList.map((item, index) => (
+                <View key={`${item.name}-${index}`} style={styles.projectComponentItem}>
+                  <Text style={styles.projectComponentItemText}>{item.name} {item.type ? `• ${item.type}` : ""} {item.capacity ? `• ${item.capacity}` : ""}{item.pricingAmount ? ` • ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.projectEquipmentBlock}>
+            <View style={styles.projectEquipmentHeader}>
+              <View style={styles.projectEquipmentIconWrap}>
+                <Image source={explorerIcons.star} style={styles.projectEquipmentTitleIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectEquipmentTitle}>MICE & Loisirs</Text>
+            </View>
+
+            <View style={styles.projectComponentGrid}>
+              {[...miceList.map((item) => ({ title: `${item.name || "MICE"} • ${item.type || "—"} • ${item.capacity || "—"}`, key: `mice-${item.name}-${item.type}` })), ...leisureList.map((item) => ({ title: `${item.name || "Loisir"} • ${item.type || "—"} • ${item.count || "—"} • ${item.surface || "—"}`, key: `leisure-${item.name}-${item.type}` }))].map((item) => (
+                <View key={item.key} style={styles.projectComponentItem}>
+                  <Text style={styles.projectComponentItemText}>{item.title}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderHotelUnitsContent = () => {
+      const rooms = hotelRooms.length > 0 ? hotelRooms : [];
+      const hasRoomData = rooms.length > 0;
+
+      return (
+        <View style={styles.projectUnitsSectionContainer}>
+          <View style={styles.projectUnitsTitleRow}>
+            <View style={styles.projectUnitsTitleIconWrap}>
+              <Image source={explorerIcons.unitsPrice} style={styles.projectUnitsSectionIcon} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectUnitsTitle}>Typologie des chambres</Text>
+          </View>
+
+          {hasRoomData ? (
+            <View style={styles.projectTypologyGrid}>
+              {rooms.map((room, index) => (
+                <View key={`${room.type || "chambre"}-${index}`} style={styles.projectTypologyCard}>
+                  <View style={styles.projectTypologyPlanZone}>
+                    <View style={styles.projectTypologyIconWrap}>
+                      <Image source={explorerIcons.fx} style={styles.projectTypologyIconImage} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectTypologyName}>{room.type || `Chambre ${index + 1}`}</Text>
+                  </View>
+
+                  <View style={styles.projectTypologyDivider} />
+
+                  <View style={styles.projectTypologySurfaceZone}>
+                    <Text style={styles.projectTypologyMetaLine}>
+                      <Text style={styles.projectTypologyMetaLabel}>Nombre: </Text>
+                      <Text style={styles.projectTypologyMetaValue}>{room.count || "N/A"}</Text>
+                    </Text>
+                    <Text style={styles.projectTypologyMetaLine}>
+                      <Text style={styles.projectTypologyMetaLabel}>Surface: </Text>
+                      <Text style={styles.projectTypologyMetaValue}>{room.surface ? `${room.surface} m²` : "N/A"}</Text>
+                    </Text>
+                  </View>
+
+                  <View style={styles.projectTypologyDivider} />
+
+                  <View style={styles.projectTypologyPriceZone}>
+                    <Text style={styles.projectTypologyPriceLabel}>Prix / nuit</Text>
+                    <Text style={styles.projectTypologyPriceValue}>
+                      {room.pricePerNight ? `${Number(room.pricePerNight).toLocaleString("fr-FR")} ${room.priceUnit || "MAD"}` : "N/A"}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyStateBox}><Text style={styles.emptyStateText}>Aucune chambre renseignée.</Text></View>
+          )}
+        </View>
+      );
+    };
+
+    const renderHotelSpecificContent = () => (
+      <View>
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.overview = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(hotelOverviewCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.characteristics = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderHotelCharacteristicsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.components = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderHotelComponentsGrid()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.units = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderHotelUnitsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.commercialization = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(hotelCommercializationCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.documents = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderDocumentsContent()}
+        </View>
+      </View>
+    );
+
+    const renderCharacteristicsContent = () => {
+      const leftRows = [
+        {
+          icon: "surface",
+          label: "Surface foncière totale",
+          value: selectedProject.surface_fonciere_totale ? `${selectedProject.surface_fonciere_totale.toLocaleString()} m²` : "N/A",
+        },
+        {
+          icon: "totalUnits",
+          label: "Nombre total d’unités",
+          value: selectedProject.total_units ? `${selectedProject.total_units.toLocaleString()} unités` : "N/A",
+        },
+      ];
+
+      const rightRows = [
+        {
+          icon: "deliveryDate",
+          label: "Date de livraison",
+          value: selectedProject.delivery_date || "N/A",
+        },
+        {
+          icon: "density",
+          label: "Densité",
+          value: projectDensity.length > 0 ? projectDensity.map((density) => `${density.density_value}${getDensityUnit(selectedProject.project_type, density.density_type) || ""}`).join(" • ") : "N/A",
+        },
+      ];
+
+      return (
+        <View style={styles.projectCharacteristicsContainer}>
+          <View style={styles.projectCharacteristicsHeader}>
+            <View style={styles.projectCharacteristicsTitleIconWrap}>
+              <Image source={explorerIcons.characteristic} style={styles.explorerIconMedium} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectCharacteristicsTitle}>Chiffres clés</Text>
+          </View>
+
+          <View style={styles.projectCharacteristicsGrid}>
+            <View style={styles.projectCharacteristicsBlock}>
+              {leftRows.map((row, index) => (
+                <View
+                  key={row.label}
+                  style={[
+                    styles.projectCharacteristicsRow,
+                    index === leftRows.length - 1 && styles.projectCharacteristicsRowLast,
+                  ]}
+                >
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons[row.icon as keyof typeof explorerIcons]} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.projectCharacteristicsBlock}>
+              {rightRows.map((row, index) => (
+                <View
+                  key={row.label}
+                  style={[
+                    styles.projectCharacteristicsRow,
+                    index === rightRows.length - 1 && styles.projectCharacteristicsRowLast,
+                  ]}
+                >
+                  <View style={styles.projectCharacteristicsLabelWrap}>
+                    <View style={styles.projectCharacteristicsItemIconWrap}>
+                      <Image source={explorerIcons[row.icon as keyof typeof explorerIcons]} style={styles.explorerIconSmall} resizeMode="contain" />
+                    </View>
+                    <Text style={styles.projectCharacteristicsLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={styles.projectCharacteristicsValue}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderComponentsGrid = () => {
+      const projectComponents = (selectedProject.project_components || []).filter(Boolean);
+      const projectAmenities = (selectedProject.amenities || []).filter(Boolean);
+
+      return (
+        <View style={styles.projectEquipmentLayout}>
+          <View style={styles.projectEquipmentBlock}>
+            <View style={styles.projectEquipmentHeader}>
+              <View style={styles.projectEquipmentIconWrap}>
+                <Image source={explorerIcons.component} style={styles.projectEquipmentTitleIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectEquipmentTitle}>Composantes du projet</Text>
+            </View>
+
+            <View style={styles.projectComponentGrid}>
+              {(projectComponents.length > 0 ? projectComponents : ["Aucune composante renseignée"]).map((item, index) => (
+                <View key={`${item}-${index}`} style={styles.projectComponentItem}>
+                  <Text style={styles.projectComponentItemText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.projectEquipmentBlock}>
+            <View style={styles.projectEquipmentHeader}>
+              <View style={styles.projectEquipmentIconWrap}>
+                <Image source={explorerIcons.star} style={styles.projectEquipmentTitleIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectEquipmentTitle}>Aménities</Text>
+            </View>
+
+            <View style={styles.projectComponentGrid}>
+              {(projectAmenities.length > 0 ? projectAmenities : ["Aucune aménity renseignée"]).map((item, index) => (
+                <View key={`${item}-${index}`} style={styles.projectComponentItem}>
+                  <Text style={styles.projectComponentItemText}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    const renderUnitsContent = () => {
+      const cards = projectTypologies.length > 0 ? projectTypologies : [];
+      const priceRangeText = projectTypologies.length > 0 ? getPriceRangeText(projectTypologies) : "N/A";
+      const minPrice = projectTypologies
+        .map((typology) => typology.pricing_min)
+        .filter((value): value is number => value != null && !Number.isNaN(value));
+      const globalMin = minPrice.length > 0 ? Math.min(...minPrice) : null;
+      const globalMax = minPrice.length > 0 ? Math.max(...minPrice) : null;
+
+      const globalPriceText = globalMin != null && globalMax != null
+        ? `Entre ${formatNumericPrice(globalMin, "MAD")} et ${formatNumericPrice(globalMax, "MAD")}`
+        : priceRangeText;
+
+      return (
+        <View style={styles.projectUnitsSectionContainer}>
+          <View style={styles.projectUnitsTitleRow}>
+            <View style={styles.projectUnitsTitleIconWrap}>
+              <Image source={explorerIcons.unitsPrice} style={styles.projectUnitsSectionIcon} resizeMode="contain" />
+            </View>
+            <Text style={styles.projectUnitsTitle}>Typologies disponibles</Text>
+          </View>
+
+          {cards.length > 0 ? (
+            <View style={styles.projectTypologyGrid}>
+              {cards.map((typology, index) => {
+                const typologyName = typology.typology || `Type ${index + 1}`;
+                const habitableText = formatRange(typology.surface_habitable_min, typology.surface_habitable_max) || "N/A";
+                const terrasseText = formatRange(typology.surface_terrasse_min, typology.surface_terrasse_max) || "N/A";
+                const totalText = (
+                  typology.surface_habitable_min != null || typology.surface_habitable_max != null ||
+                  typology.surface_terrasse_min != null || typology.surface_terrasse_max != null
+                )
+                  ? formatRange(
+                      typology.surface_habitable_min != null && typology.surface_terrasse_min != null
+                        ? typology.surface_habitable_min + typology.surface_terrasse_min
+                        : undefined,
+                      typology.surface_habitable_max != null && typology.surface_terrasse_max != null
+                        ? typology.surface_habitable_max + typology.surface_terrasse_max
+                        : undefined,
+                    ) || "N/A"
+                  : "N/A";
+                const pricePerM2 = getTypologyPricePerSquareMeter(typology);
+                const startPrice = typology.pricing_min != null ? formatNumericPrice(typology.pricing_min, typology.pricing_unit || "MAD") : "N/A";
+
+                return (
+                  <View key={typology.id || `${typologyName}-${index}`} style={styles.projectTypologyCard}>
+                    <View style={styles.projectTypologyPlanZone}>
+                      <View style={styles.projectTypologyIconWrap}>
+                        <Image source={explorerIcons.fx} style={styles.projectTypologyIconImage} resizeMode="contain" />
+                      </View>
+                      <Text style={styles.projectTypologyName}>{typologyName}</Text>
+                    </View>
+
+                    <View style={styles.projectTypologyDivider} />
+
+                    <View style={styles.projectTypologySurfaceZone}>
+                      <Text style={styles.projectTypologyMetaLine}>
+                        <Text style={styles.projectTypologyMetaLabel}>Surface habitable: </Text>
+                        <Text style={styles.projectTypologyMetaValue}>{habitableText} m²</Text>
+                      </Text>
+                      <Text style={styles.projectTypologyMetaLine}>
+                        <Text style={styles.projectTypologyMetaLabel}>Surface terrasse: </Text>
+                        <Text style={styles.projectTypologyMetaValue}>{terrasseText} m²</Text>
+                      </Text>
+                      <Text style={styles.projectTypologyMetaLine}>
+                        <Text style={styles.projectTypologyMetaLabel}>Surface totale: </Text>
+                        <Text style={styles.projectTypologyMetaValue}>{totalText} m²</Text>
+                      </Text>
+                    </View>
+
+                    <View style={styles.projectTypologyDivider} />
+
+                    <View style={styles.projectTypologyPriceZone}>
+                      <Text style={styles.projectTypologyPriceLabel}>Prix au m²</Text>
+                      <Text style={styles.projectTypologyPriceValue}>{pricePerM2 != null ? `${pricePerM2.toLocaleString("fr-FR")} MAD` : "N/A"}</Text>
+                      <Text style={styles.projectTypologyStartLabel}>À partir de</Text>
+                      <Text style={styles.projectTypologyStartValue}>{startPrice}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.emptyStateBox}><Text style={styles.emptyStateText}>Aucune typologie renseignée.</Text></View>
+          )}
+
+          <View style={styles.projectGlobalPriceBox}>
+            <View style={styles.projectGlobalPriceLabelWrap}>
+              <View style={styles.projectGlobalPriceIconWrap}>
+                <Image source={explorerIcons.globalPriceRange} style={styles.projectGlobalPriceIconImage} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectGlobalPriceLabel}>Gamme de prix globale</Text>
+            </View>
+            <Text style={styles.projectGlobalPriceValue}>{globalPriceText}</Text>
+          </View>
+        </View>
+      );
+    };
+
+    const renderDocumentsContent = () => {
+      const documentTypeMeta = (doc: (typeof documentRows)[number]) => {
+        const rawType = (doc.format || "Document").toString().trim();
+        const normalizedType = rawType.toUpperCase();
+        const lower = normalizedType.toLowerCase();
+
+        if (lower.includes("pdf")) {
+          return { icon: "PDF", tone: "#d83b3b", background: "#FFE9EA" };
+        }
+        if (lower.includes("image") || lower.includes("png") || lower.includes("jpg") || lower.includes("jpeg") || lower.includes("webp")) {
+          return { icon: lower.includes("png") ? "PNG" : lower.includes("webp") ? "WEBP" : "JPG", tone: "#12a86f", background: "#E8F9F0" };
+        }
+        if (lower.includes("cad")) {
+          return { icon: "CAD", tone: "#6a5cff", background: "#F0EEFF" };
+        }
+        if (lower.includes("excel") || lower.includes("xls") || lower.includes("csv")) {
+          return { icon: "XLS", tone: "#1a8f4d", background: "#EAF9F0" };
+        }
+        return { icon: "DOC", tone: "#0c7ea3", background: "#EAF7FB" };
+      };
+
+      const documentMetaText = (doc: (typeof documentRows)[number]) => {
+        const typeMeta = documentTypeMeta(doc);
+        const rawType = (doc.format || "Document").toString().trim();
+        const displayType = rawType && rawType.toLowerCase() !== "document" && rawType.toLowerCase() !== "—"
+          ? typeMeta.icon
+          : "Document";
+
+        return displayType;
+      };
+
+      return (
+        <View style={styles.projectDocumentsLayout}>
+          <View style={styles.projectDocumentPanel}>
+            <View style={styles.projectDocumentHeader}>
+              <View style={styles.projectDocumentHeaderIconWrap}>
+                <Image source={explorerIcons.documents} style={styles.projectSectionHeaderIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectDocumentHeaderTitle}>Documents disponibles</Text>
+            </View>
+
+            <View style={styles.projectDocumentList}>
+              {documentRows.map((doc) => {
+                const typeMeta = documentTypeMeta(doc);
+                const metaText = documentMetaText(doc);
+
+                return (
+                  <View key={doc.id} style={styles.projectDocumentRow}>
+                    <View style={styles.projectDocumentRowMain}>
+                      <View style={[styles.projectDocumentFileBadge, { backgroundColor: typeMeta.background }]}>
+                        <View style={[styles.projectDocumentFileBadgeInner, { backgroundColor: typeMeta.tone }]}>
+                          <Text style={styles.projectDocumentFileBadgeText}>{typeMeta.icon}</Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.projectDocumentInfo}>
+                        <Text style={styles.projectDocumentName}>{doc.title}</Text>
+                        <Text style={styles.projectDocumentMeta}>{metaText}</Text>
+                      </View>
+                    </View>
+
+                    {doc.url ? (
+                      <TouchableOpacity style={styles.projectDownloadButton} onPress={() => Linking.openURL(doc.url)}>
+                        <Image source={explorerIcons.download} style={styles.projectDownloadIcon} resizeMode="contain" />
+                        <Text style={styles.projectDownloadButtonText}>Télécharger</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.projectDownloadButtonDisabled}>
+                        <Image source={explorerIcons.download} style={styles.projectDownloadIcon} resizeMode="contain" />
+                        <Text style={styles.projectDownloadButtonText}>Télécharger</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.projectDocumentPanel}>
+            <View style={styles.projectDocumentHeader}>
+              <View style={styles.projectDocumentHeaderIconWrap}>
+                <Image source={explorerIcons.source} style={styles.projectSectionHeaderIcon} resizeMode="contain" />
+              </View>
+              <Text style={styles.projectDocumentHeaderTitle}>Source</Text>
+            </View>
+
+            <View style={styles.projectSourceUrlBox}>
+              <Text style={styles.projectSourceLinkText}>{selectedProject.source_link || "Aucun lien source enregistré"}</Text>
+            </View>
+
+            {selectedProject.source_link ? (
+              <TouchableOpacity style={styles.projectSourceButton} onPress={() => openSourceLink(selectedProject.source_link!)}>
+                <Image source={explorerIcons.openSource} style={styles.projectOpenSourceIcon} resizeMode="contain" />
+                <Text style={styles.projectSourceButtonText}>Ouvrir la source</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <View style={styles.projectSourceNote}>
+              <View style={styles.projectSourceNoteHeader}>
+                <View style={styles.projectSourceNoteIconWrap}>
+                  <Image source={explorerIcons.note} style={styles.projectInfoIcon} resizeMode="contain" />
+                </View>
+                <Text style={styles.projectSourceNoteTitle}>Note</Text>
+              </View>
+              <Text style={styles.projectSourceNoteText}>Ce lien renvoie vers la source d’origine du projet. Assurez-vous d’avoir les droits d’accès nécessaires.</Text>
+            </View>
+          </View>
+        </View>
+      );
+    };
+
+    if (isHotelProject) {
+      return renderHotelSpecificContent();
+    }
+
+    if (isRetailProject) {
+      return renderRetailSpecificContent();
+    }
+
+    if (isOfficeProject) {
+      return renderOfficeSpecificContent();
+    }
+
+    if (isArtCultureProject) {
+      return renderArtCultureSpecificContent();
+    }
+
+    return (
+      <View>
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.overview = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(overviewCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.characteristics = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCharacteristicsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.components = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderComponentsGrid()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.units = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderUnitsContent()}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.commercialization = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderCardGrid(commercializationCards)}
+        </View>
+
+        <View
+          style={styles.projectCollectiveSectionBlock}
+          onLayout={(event) => {
+            projectDetailSectionOffsets.current.documents = event.nativeEvent.layout.y;
+          }}
+        >
+          {renderDocumentsContent()}
+        </View>
+      </View>
+    );
+  };
+
   useFocusEffect(
     useCallback(() => {
       fetchProjects();
@@ -975,6 +2325,12 @@ export default function MapScreen({
   }, [selectionRect]);
 
   const selectedTypeFilters = useMemo(() => getProjectFilterTypes(selectedProject?.project_type), [selectedProject?.project_type]);
+  const normalizedProjectType = (selectedProject?.project_type || "").toLowerCase();
+  const isCollectiveProject = normalizedProjectType.includes("collectif");
+  const isVillaProject = normalizedProjectType.includes("villa") && !normalizedProjectType.includes("lot");
+  const isLotVillaProject = normalizedProjectType.includes("lot") && normalizedProjectType.includes("villa");
+  const isHotelProjectDetail = selectedTypeFilters.includes("Hotel") || normalizedProjectType.includes("hotel") || normalizedProjectType.includes("hôtel");
+  const isResidentialProjectDetail = isCollectiveProject || isVillaProject || isLotVillaProject;
   const isRetailSelected = selectedTypeFilters.includes("Retail");
   const isOfficeSelected = selectedTypeFilters.includes("Bureau");
   const isHealthSelected = selectedTypeFilters.includes("Santé");
@@ -983,6 +2339,7 @@ export default function MapScreen({
   const isEducationSelected = selectedTypeFilters.includes("Education");
   const isArtCultureSelected = selectedTypeFilters.includes("Art et culture");
   const isLeisureSelected = selectedTypeFilters.includes("Loisir");
+  const isPremiumProjectDetail = isResidentialProjectDetail || isHotelProjectDetail || isRetailSelected || isOfficeSelected || isHealthSelected || isSportSelected || isEducationSelected || isArtCultureSelected || isLeisureSelected;
 
   const normalizeUrl = (value: string) => {
     const trimmed = value.trim();
@@ -1081,6 +2438,515 @@ export default function MapScreen({
     setSelectionStart(null);
   }, [isSelectionMode, selectionStart]);
 
+  const exportHotelProjectToPpt = useCallback(async () => {
+    if (Platform.OS !== "web") {
+      showNotice({
+        type: "info",
+        title: "Export PPT",
+        message: "Cette fonctionnalité est disponible sur la version web pour le moment.",
+        primaryLabel: "OK",
+      });
+      return;
+    }
+
+    if (!selectedProject) {
+      showNotice({
+        type: "warning",
+        title: "Export PPT",
+        message: "Aucun projet hôtel sélectionné.",
+        primaryLabel: "OK",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      const PptxGenJS = require("pptxgenjs");
+
+      const hotelDetails = projectExtendedDetails?.hotel || {};
+      const hotelRooms = Array.isArray(hotelDetails.rooms) ? hotelDetails.rooms.filter((room) => room && typeof room === "object") : [];
+      const hotelFnb = Array.isArray(hotelDetails.fnb) ? hotelDetails.fnb.filter((item) => item && typeof item === "object") : [];
+      const hotelMice = Array.isArray(hotelDetails.mice) ? hotelDetails.mice.filter((item) => item && typeof item === "object") : [];
+      const hotelLeisure = Array.isArray(hotelDetails.leisure) ? hotelDetails.leisure.filter((item) => item && typeof item === "object") : [];
+      const hotelImageUrls = projectMedia
+        .filter((media) => {
+          const mediaType = String(media.media_type || "").toLowerCase();
+          const mediaUrl = String(media.media_url || "");
+          return mediaType.includes("image") || /\.(png|jpg|jpeg|webp|gif|bmp)$/i.test(mediaUrl);
+        })
+        .map((media) => media.media_url)
+        .filter(Boolean)
+        .slice(0, 2);
+
+      const toDataUrl = async (url: string) => {
+        try {
+          const imageResponse = await fetch(url);
+          const imageBlob = await imageResponse.blob();
+          return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(String(reader.result));
+            reader.onerror = () => reject(new Error("Image conversion failed"));
+            reader.readAsDataURL(imageBlob);
+          });
+        } catch {
+          return null;
+        }
+      };
+
+      const parseNumber = (value?: string | number | null) => {
+        if (value == null) return null;
+        const parsed = Number(String(value).replace(/[^0-9.,-]/g, "").replace(",", "."));
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+
+      const formatDateForPpt = (value?: string) => {
+        if (!value) return "-";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          const [year, month, day] = value.split("-");
+          return `${day}/${month}/${year}`;
+        }
+        return value;
+      };
+
+      const safeText = (value?: string | number | null, fallback = "N/A") => {
+        if (value == null) return fallback;
+        const text = String(value).trim();
+        return text.length > 0 ? text : fallback;
+      };
+
+      const pptx = new PptxGenJS();
+      pptx.layout = "LAYOUT_WIDE";
+      const slide = pptx.addSlide();
+      slide.background = { color: "FFFFFF" };
+
+      const title = String(selectedProject.name || "Projet hôtel");
+      const subtitle = `ZOOM SUR LE ${title.toUpperCase()}: FICHE PROJET HÔTEL`;
+      const categoryValue = safeText(hotelDetails.category, "-");
+      const bookingValue = safeText(hotelDetails.bookingNote, "-");
+      const operatorValue = safeText(hotelDetails.operator || hotelDetails.manager, "-");
+      const investorValue = safeText(hotelDetails.investor, "-");
+      const keysNumber = parseNumber(hotelDetails.keys);
+      const keysValue = keysNumber != null ? `${keysNumber.toLocaleString("fr-FR")} chambres` : "-";
+      const openingDateValue = formatDateForPpt(hotelDetails.openingDate);
+      const renovationDateValue = formatDateForPpt(hotelDetails.renovationDate);
+      const roomCount = hotelRooms.reduce((sum, room) => {
+        const parsed = parseNumber(room.count);
+        return sum + (parsed != null ? parsed : 0);
+      }, 0);
+
+      slide.addText("Outlook Marché – Tourisme & Hôtellerie", {
+        x: 0.55,
+        y: 0.34,
+        w: 8.9,
+        h: 0.52,
+        fontFace: "Century Gothic",
+        fontSize: 30,
+        bold: false,
+        color: "31849B",
+        margin: 0,
+      });
+
+      slide.addText(subtitle, {
+        x: 0.55,
+        y: 0.92,
+        w: 12.2,
+        h: 0.34,
+        fontFace: "Century Gothic",
+        fontSize: 20,
+        color: "7F7F7F",
+        margin: 0,
+        bold: false,
+        fit: "shrink",
+      });
+
+      const leftX = 0.4;
+      const leftY = 1.45;
+      const leftW = 7.2;
+      const rightX = 8.05;
+      const rightW = 4.9;
+
+      const drawImagePlaceholder = (x: number, y: number, h: number) => {
+        slide.addShape(pptx.ShapeType.rect, {
+          x,
+          y,
+          w: rightW,
+          h,
+          fill: { color: "F4F4F4" },
+          line: { color: "D9DDE2", width: 1 },
+        });
+        slide.addText("Image non disponible", {
+          x,
+          y: y + h / 2 - 0.15,
+          w: rightW,
+          h: 0.3,
+          fontFace: "Century Gothic",
+          fontSize: 12,
+          bold: true,
+          color: "80868B",
+          align: "center",
+          valign: "middle",
+          margin: 0,
+        });
+      };
+
+      const topImageY = leftY;
+      const topImageH = 2.95;
+      const bottomImageY = topImageY + topImageH + 0.12;
+      const bottomImageH = 2.95;
+      const imageDataUrls = await Promise.all(hotelImageUrls.map((url) => toDataUrl(url)));
+
+      if (imageDataUrls[0]) {
+        slide.addImage({ data: imageDataUrls[0], x: rightX, y: topImageY, w: rightW, h: topImageH });
+      } else {
+        drawImagePlaceholder(rightX, topImageY, topImageH);
+      }
+
+      if (imageDataUrls[1]) {
+        slide.addImage({ data: imageDataUrls[1], x: rightX, y: bottomImageY, w: rightW, h: bottomImageH });
+      } else {
+        drawImagePlaceholder(rightX, bottomImageY, bottomImageH);
+      }
+
+      slide.addShape(pptx.ShapeType.rect, {
+        x: leftX,
+        y: leftY,
+        w: leftW,
+        h: 0.33,
+        fill: { color: "31849B" },
+        line: { color: "31849B", width: 0.8 },
+      });
+      slide.addText(title.toUpperCase(), {
+        x: leftX,
+        y: leftY + 0.04,
+        w: leftW,
+        h: 0.22,
+        align: "center",
+        fontFace: "Century Gothic",
+        fontSize: 13,
+        bold: true,
+        color: "FFFFFF",
+        margin: 0,
+        fit: "shrink",
+      });
+
+      const infoRows: Array<[string, string]> = [
+        ["Nombre de clés", keysValue],
+        ["Investisseur / Operateur", `${investorValue} / ${operatorValue}`],
+        ["Date d’ouverture/rénovation", `${openingDateValue} / ${renovationDateValue}`],
+        ["Catégorie", categoryValue],
+        ["Note Booking", bookingValue],
+      ];
+
+      const infoStartY = leftY + 0.33;
+      const infoRowH = 0.29;
+      const labelW = 2.95;
+      const valueW = leftW - labelW;
+
+      infoRows.forEach((row, index) => {
+        const rowY = infoStartY + index * infoRowH;
+        const fillColor = index % 2 === 0 ? "E8EDF2" : "D8E0E8";
+        slide.addShape(pptx.ShapeType.rect, {
+          x: leftX,
+          y: rowY,
+          w: labelW,
+          h: infoRowH,
+          fill: { color: fillColor },
+          line: { color: "FFFFFF", width: 0.7 },
+        });
+        slide.addShape(pptx.ShapeType.rect, {
+          x: leftX + labelW,
+          y: rowY,
+          w: valueW,
+          h: infoRowH,
+          fill: { color: "F2F5F8" },
+          line: { color: "FFFFFF", width: 0.7 },
+        });
+        slide.addText(row[0], {
+          x: leftX + 0.07,
+          y: rowY + 0.06,
+          w: labelW - 0.12,
+          h: 0.2,
+          fontFace: "Century Gothic",
+          fontSize: 11,
+          bold: true,
+          color: "1F2937",
+          margin: 0,
+          fit: "shrink",
+        });
+        slide.addText(row[1], {
+          x: leftX + labelW + 0.07,
+          y: rowY + 0.055,
+          w: valueW - 0.12,
+          h: 0.21,
+          fontFace: "Century Gothic",
+          fontSize: 10.5,
+          bold: index === 0,
+          italic: index === 0,
+          color: "111827",
+          margin: 0,
+          fit: "shrink",
+        });
+      });
+
+      const sectionY = infoStartY + infoRows.length * infoRowH;
+      slide.addShape(pptx.ShapeType.rect, {
+        x: leftX,
+        y: sectionY,
+        w: leftW,
+        h: 0.27,
+        fill: { color: "31849B" },
+        line: { color: "31849B", width: 0.8 },
+      });
+      slide.addText("Programmation actuelle", {
+        x: leftX + 0.07,
+        y: sectionY + 0.045,
+        w: leftW - 0.14,
+        h: 0.18,
+        fontFace: "Century Gothic",
+        fontSize: 12,
+        bold: true,
+        color: "FFFFFF",
+        margin: 0,
+      });
+
+      type ProgramRow = { group: string; item: string; number: string; metric: string; section?: boolean };
+      const programRows: ProgramRow[] = [];
+      const appendSectionRows = (groupName: string, rows: ProgramRow[]) => {
+        rows.forEach((row, index) => {
+          programRows.push({
+            group: index === 0 ? groupName : "",
+            item: row.item,
+            number: row.number,
+            metric: row.metric,
+          });
+        });
+      };
+
+      const roomProgramRows = (hotelRooms.length > 0 ? hotelRooms : [{ type: "N/A", count: "N/A", surface: "N/A" }]).map((room) => ({
+        group: "",
+        item: safeText(room.type, "Chambre"),
+        number: safeText(room.count, "N/A"),
+        metric: room.surface ? `${room.surface} m²/unité` : "N/A",
+      }));
+
+      const fnbProgramRows = (hotelFnb.length > 0 ? hotelFnb : [{ name: "N/A", capacity: "N/A" }]).map((item) => ({
+        group: "",
+        item: safeText(item.name, "N/A"),
+        number: item.capacity ? `${item.capacity}` : "N/A",
+        metric: safeText(item.type, "N/A"),
+      }));
+
+      const miceProgramRows = (hotelMice.length > 0 ? hotelMice : [{ name: "N/A", roomsCount: "N/A", surface: "N/A" }]).map((item) => ({
+        group: "",
+        item: safeText(item.name, "N/A"),
+        number: item.roomsCount || item.capacity || "N/A",
+        metric: item.surface ? `${item.surface} m²` : "N/A",
+      }));
+
+      const leisureProgramRows = (hotelLeisure.length > 0 ? hotelLeisure : [{ name: "N/A", surface: "N/A" }]).map((item) => ({
+        group: "",
+        item: safeText(item.name, "N/A"),
+        number: item.count || item.capacity || "N/A",
+        metric: item.surface ? `${item.surface} m²` : "N/A",
+      }));
+
+      appendSectionRows("Hébergement", roomProgramRows.slice(0, 6));
+      appendSectionRows("F&B", fnbProgramRows.slice(0, 5));
+      appendSectionRows("MICE", miceProgramRows.slice(0, 4));
+      appendSectionRows("Loisirs", leisureProgramRows.slice(0, 4));
+
+      const tableHeadY = sectionY + 0.27;
+      const colWidths = [1.55, 2.2, 1.2, 2.25];
+      const colXs = [
+        leftX,
+        leftX + colWidths[0],
+        leftX + colWidths[0] + colWidths[1],
+        leftX + colWidths[0] + colWidths[1] + colWidths[2],
+      ];
+
+      slide.addShape(pptx.ShapeType.rect, {
+        x: leftX,
+        y: tableHeadY,
+        w: leftW,
+        h: 0.3,
+        fill: { color: "CBD6DF" },
+        line: { color: "FFFFFF", width: 0.7 },
+      });
+      slide.addText("", {
+        x: colXs[0] + 0.04,
+        y: tableHeadY + 0.05,
+        w: colWidths[0] - 0.08,
+        h: 0.2,
+        fontFace: "Century Gothic",
+        fontSize: 10,
+        bold: true,
+        color: "2B3945",
+        margin: 0,
+      });
+      slide.addText("Type de chambre", {
+        x: colXs[1] + 0.04,
+        y: tableHeadY + 0.05,
+        w: colWidths[1] - 0.08,
+        h: 0.2,
+        fontFace: "Century Gothic",
+        fontSize: 10,
+        bold: true,
+        color: "2B3945",
+        margin: 0,
+      });
+      slide.addText("Nombre", {
+        x: colXs[2] + 0.04,
+        y: tableHeadY + 0.05,
+        w: colWidths[2] - 0.08,
+        h: 0.2,
+        align: "center",
+        fontFace: "Century Gothic",
+        fontSize: 10,
+        bold: true,
+        color: "2B3945",
+        margin: 0,
+      });
+      slide.addText("Surface/Capacité", {
+        x: colXs[3] + 0.04,
+        y: tableHeadY + 0.05,
+        w: colWidths[3] - 0.08,
+        h: 0.2,
+        align: "center",
+        fontFace: "Century Gothic",
+        fontSize: 10,
+        bold: true,
+        color: "2B3945",
+        margin: 0,
+      });
+
+      const maxRows = 13;
+      const finalProgramRows = programRows.slice(0, maxRows);
+      const dataRowH = 0.255;
+      finalProgramRows.forEach((row, index) => {
+        const rowY = tableHeadY + 0.3 + index * dataRowH;
+        const fillColor = index % 2 === 0 ? "EEF2F6" : "E2E9F0";
+
+        slide.addShape(pptx.ShapeType.rect, {
+          x: leftX,
+          y: rowY,
+          w: leftW,
+          h: dataRowH,
+          fill: { color: fillColor },
+          line: { color: "FFFFFF", width: 0.7 },
+        });
+
+        slide.addText(row.group, {
+          x: colXs[0] + 0.06,
+          y: rowY + 0.045,
+          w: colWidths[0] - 0.1,
+          h: 0.16,
+          fontFace: "Century Gothic",
+          fontSize: 10,
+          bold: true,
+          color: "3A4A57",
+          margin: 0,
+          fit: "shrink",
+        });
+        slide.addText(row.item, {
+          x: colXs[1] + 0.06,
+          y: rowY + 0.045,
+          w: colWidths[1] - 0.1,
+          h: 0.16,
+          fontFace: "Century Gothic",
+          fontSize: 10,
+          italic: true,
+          color: "4B5563",
+          margin: 0,
+          fit: "shrink",
+        });
+        slide.addText(safeText(row.number, "N/A"), {
+          x: colXs[2] + 0.03,
+          y: rowY + 0.04,
+          w: colWidths[2] - 0.06,
+          h: 0.16,
+          align: "center",
+          fontFace: "Century Gothic",
+          fontSize: 10,
+          bold: true,
+          color: "4B5563",
+          margin: 0,
+          fit: "shrink",
+        });
+        slide.addText(safeText(row.metric, "N/A"), {
+          x: colXs[3] + 0.03,
+          y: rowY + 0.04,
+          w: colWidths[3] - 0.06,
+          h: 0.16,
+          align: "center",
+          fontFace: "Century Gothic",
+          fontSize: 10,
+          color: "4B5563",
+          margin: 0,
+          fit: "shrink",
+        });
+      });
+
+      colXs.slice(1).forEach((lineX) => {
+        const h = 0.3 + finalProgramRows.length * dataRowH;
+        slide.addShape(pptx.ShapeType.line, {
+          x: lineX,
+          y: tableHeadY,
+          w: 0,
+          h,
+          line: { color: "FFFFFF", width: 0.7 },
+        });
+      });
+
+      slide.addText(`Statut: ${safeText(selectedProject.status, "-")}   •   Localisation: ${safeText([selectedProject.country, selectedProject.city].filter(Boolean).join(", "), "-")}   •   Développeur: ${safeText(selectedProject.developer, "-")}`, {
+        x: 0.55,
+        y: 7.08,
+        w: 12.2,
+        h: 0.22,
+        fontFace: "Century Gothic",
+        fontSize: 9,
+        color: "6B7280",
+        margin: 0,
+        fit: "shrink",
+      });
+
+      if (roomCount > 0 && !hotelDetails.keys) {
+        slide.addText(`Total chambres recensées: ${roomCount.toLocaleString("fr-FR")}`, {
+          x: 0.55,
+          y: 6.84,
+          w: 3.7,
+          h: 0.2,
+          fontFace: "Century Gothic",
+          fontSize: 9,
+          bold: true,
+          color: "31849B",
+          margin: 0,
+        });
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const safeFileName = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "hotel-projet";
+      await pptx.writeFile({ fileName: `${safeFileName}-export-${timestamp}.pptx` });
+      showNotice({
+        type: "success",
+        title: "Export PPT",
+        message: "Le document PowerPoint du projet hôtel a bien été généré.",
+        primaryLabel: "OK",
+      });
+    } catch (error) {
+      console.error("Hotel PPT export failed", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      showNotice({
+        type: "error",
+        title: "Export PPT",
+        message: `Impossible de générer le fichier PPT: ${errorMessage}`,
+        primaryLabel: "Fermer",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  }, [projectExtendedDetails, projectMedia, selectedProject, showNotice]);
+
   const exportMappingToPpt = useCallback(async () => {
     if (Platform.OS !== "web") {
       showNotice({
@@ -1116,8 +2982,8 @@ export default function MapScreen({
     setIsExporting(true);
 
     try {
-      const [{ default: PptxGenJS }, htmlToImage] = await Promise.all([
-        import("pptxgenjs"),
+      const PptxGenJS = require("pptxgenjs");
+      const [{ default: htmlToImage }] = await Promise.all([
         import("html-to-image"),
       ]);
 
@@ -1706,28 +3572,201 @@ export default function MapScreen({
       <Modal visible={selectedProject !== null} transparent animationType="slide">
         <View style={styles.detailsModalOverlay}>
           <View style={styles.detailsModalContent}>
-            <Pressable 
-              style={styles.detailsCloseArea}
-              onPress={closeDetailsModal}
-            />
+            <Pressable style={styles.detailsCloseArea} onPress={closeDetailsModal} />
 
-            <View style={styles.detailsHeader}>
-              <Text style={styles.detailsTitle}>{selectedProject?.name}</Text>
-              <Pressable onPress={closeDetailsModal}>
-                <Text style={styles.detailsCloseButton}>✕</Text>
-              </Pressable>
-            </View>
+            {selectedProject && isPremiumProjectDetail ? (
+              <View style={styles.projectDetailShell}>
+                <View style={styles.projectDetailHeader}>
+                  <View style={styles.projectGalleryWrapper}>
+                    {projectMedia.length > 0 ? (
+                      <>
+                        <Image
+                          source={{ uri: projectMedia[activeProjectMediaIndex]?.media_url || projectMedia[0].media_url }}
+                          style={styles.projectDetailImage}
+                          resizeMode="cover"
+                        />
+                        <View style={styles.projectImageCounter}>
+                          <Text style={styles.projectImageCounterText}>{`${activeProjectMediaIndex + 1} / ${projectMedia.length}`}</Text>
+                        </View>
+                        {projectMedia.length > 1 && (
+                          <View style={styles.projectImageArrows}>
+                            <Pressable
+                              style={styles.projectImageArrowButton}
+                              onPress={() => setActiveProjectMediaIndex((previous) => (previous === 0 ? projectMedia.length - 1 : previous - 1))}
+                            >
+                              <Text style={styles.projectImageArrowText}>‹</Text>
+                            </Pressable>
+                            <Pressable
+                              style={styles.projectImageArrowButton}
+                              onPress={() => setActiveProjectMediaIndex((previous) => (previous + 1) % projectMedia.length)}
+                            >
+                              <Text style={styles.projectImageArrowText}>›</Text>
+                            </Pressable>
+                          </View>
+                        )}
+                      </>
+                    ) : (
+                      <View style={styles.projectGalleryPlaceholder}>
+                        <View style={styles.projectGalleryPlaceholderFrame}>
+                          <View style={styles.projectGalleryPlaceholderSun} />
+                          <View style={styles.projectGalleryPlaceholderHillA} />
+                          <View style={styles.projectGalleryPlaceholderHillB} />
+                        </View>
+                        <Text style={styles.projectGalleryPlaceholderTitle}>Aucune image disponible</Text>
+                        <Text style={styles.projectGalleryPlaceholderText}>Les photos du projet seront affichées ici</Text>
+                      </View>
+                    )}
+                  </View>
 
-            <View style={styles.headerMetaRow}>
-              {selectedProject?.project_type ? <Text style={styles.headerMetaPill}>{selectedProject.project_type}</Text> : null}
-              {selectedProject?.status ? <Text style={styles.headerMetaPill}>{selectedProject.status}</Text> : null}
-              {selectedProject?.country ? <Text style={styles.headerMetaPill}>{selectedProject.country}</Text> : null}
-              {selectedProject?.city ? <Text style={styles.headerMetaPill}>{selectedProject.city}</Text> : null}
-            </View>
+                  <View style={styles.projectSummaryColumn}>
+                    <View style={styles.projectStatusBadge}>
+                      <Text style={styles.projectStatusBadgeText}>{selectedProject.status || "Statut non renseigné"}</Text>
+                    </View>
 
-            <ScrollView style={styles.detailsScrollView} scrollEnabled={true}>
-              {selectedProject && (
-                <>
+                    <Text style={styles.projectSummaryTitle}>{selectedProject.name}</Text>
+
+                    <View style={styles.projectSummaryLine}>
+                      <View style={styles.projectSummaryIconPlaceholder}>
+                        <Image source={explorerIcons.collectif} style={styles.projectSummaryIconImage} resizeMode="contain" />
+                      </View>
+                      <Text style={styles.projectSummaryText}>{selectedProject.project_type || "Collectif"}</Text>
+                    </View>
+
+                    <View style={styles.projectSummaryLine}>
+                      <View style={[styles.projectSummaryIconPlaceholder, styles.projectSummaryIconPin]}>
+                        <Image source={explorerIcons.localisation} style={styles.projectSummaryIconImage} resizeMode="contain" />
+                      </View>
+                      <Text style={styles.projectSummaryText}>{[selectedProject.country, selectedProject.city].filter(Boolean).join(", ") || "Localisation"}</Text>
+                    </View>
+
+                    <View style={styles.projectSummaryLine}>
+                      <View style={[styles.projectSummaryIconPlaceholder, styles.projectSummaryIconBuilding]}>
+                        <Image source={explorerIcons.developer} style={styles.projectSummaryIconImage} resizeMode="contain" />
+                      </View>
+                      <Text style={styles.projectSummaryText}>{selectedProject.developer || "Développeur non renseigné"}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.projectMiniMapContainer}>
+                    <View style={styles.projectMiniMapCard}>
+                      <View style={styles.projectMiniMapPin} />
+                      <Text style={styles.projectMiniMapText}>{selectedProject.city || "Casablanca"}</Text>
+                    </View>
+                  </View>
+
+                  <Pressable style={styles.projectCloseButton} onPress={closeDetailsModal}>
+                    <Text style={styles.projectCloseButtonText}>✕</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.projectTabsRow}>
+                  {[
+                    "overview",
+                    "characteristics",
+                    "components",
+                    "units",
+                    "commercialization",
+                    "documents",
+                  ].map((tabKey) => {
+                    const isActive = activeProjectTab === tabKey;
+                    const labels: Record<string, string> = {
+                      overview: "Vue d’ensemble",
+                      characteristics: "Caractéristiques",
+                      components: "Équipements",
+                      units: "Unités & Prix",
+                      commercialization: "Commercialisation",
+                      documents: "Documents & Source",
+                    };
+                    const iconMap: Record<string, keyof typeof explorerIcons> = {
+                      overview: "collectif",
+                      characteristics: "characteristic",
+                      components: "component",
+                      units: "unitsPrice",
+                      commercialization: "commercializationRate",
+                      documents: "documents",
+                    };
+
+                    return (
+                      <TouchableOpacity
+                        key={tabKey}
+                        style={[styles.projectTabButton, isActive && styles.projectTabButtonActive]}
+                        onPress={() => handleCollectiveTabPress(tabKey as typeof projectDetailSectionKeys[number])}
+                        activeOpacity={0.9}
+                      >
+                        <View style={styles.projectTabIconSlot}>
+                          <Image source={explorerIcons[iconMap[tabKey]]} style={styles.projectTabIconImage} resizeMode="contain" />
+                        </View>
+                        <Text style={[styles.projectTabText, isActive && styles.projectTabTextActive]}>{labels[tabKey]}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <ScrollView
+                  ref={projectDetailScrollRef}
+                  style={styles.projectTabContentScroll}
+                  contentContainerStyle={styles.projectTabContentContainer}
+                  showsVerticalScrollIndicator={false}
+                  onScroll={({ nativeEvent }) => syncCollectiveDetailTabFromScroll(nativeEvent.contentOffset.y)}
+                  scrollEventThrottle={16}
+                >
+                  {renderActiveProjectTabContent()}
+                </ScrollView>
+
+                <View style={styles.projectFooterActions}>
+                  <TouchableOpacity style={styles.projectMapAction} onPress={() => { closeDetailsModal(); }}>
+                    <Text style={styles.projectMapActionText}>📍 Voir sur la carte</Text>
+                  </TouchableOpacity>
+
+                  <View style={styles.projectFooterActionGroup}>
+                    <TouchableOpacity
+                      style={styles.projectEditAction}
+                      onPress={() => {
+                        closeDetailsModal();
+                        router.push(`/(tabs)/AddProject?projectId=${selectedProject.id}`);
+                      }}
+                    >
+                      <Text style={styles.projectEditActionText}>✏️ Modifier ce projet</Text>
+                    </TouchableOpacity>
+
+                    {isHotelProjectDetail ? (
+                      <TouchableOpacity
+                        style={styles.projectExportAction}
+                        onPress={exportHotelProjectToPpt}
+                        disabled={isExporting}
+                      >
+                        <Text style={styles.projectExportActionText}>{isExporting ? "⏳ Export..." : "📤 Exporter"}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    <TouchableOpacity
+                      style={styles.projectDeleteAction}
+                      onPress={() => {
+                        deleteProject(selectedProject.id);
+                      }}
+                    >
+                      <Text style={styles.projectDeleteActionText}>🗑️ Supprimer ce projet</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ) : selectedProject ? (
+              <>
+                <View style={styles.detailsHeader}>
+                  <Text style={styles.detailsTitle}>{selectedProject.name}</Text>
+                  <Pressable onPress={closeDetailsModal}>
+                    <Text style={styles.detailsCloseButton}>✕</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.headerMetaRow}>
+                  {selectedProject.project_type ? <Text style={styles.headerMetaPill}>{selectedProject.project_type}</Text> : null}
+                  {selectedProject.status ? <Text style={styles.headerMetaPill}>{selectedProject.status}</Text> : null}
+                  {selectedProject.country ? <Text style={styles.headerMetaPill}>{selectedProject.country}</Text> : null}
+                  {selectedProject.city ? <Text style={styles.headerMetaPill}>{selectedProject.city}</Text> : null}
+                </View>
+
+                <ScrollView style={styles.detailsScrollView} scrollEnabled={true}>
                   {projectMedia.length > 0 && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Images</Text>
@@ -1742,29 +3781,21 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* === INFORMATIONS GÉNÉRALES === */}
-                  
-                  {/* Développeur */}
-                  {selectedProject.developer && (
-                    <View style={styles.detailsSection}>
-                      <Text style={styles.detailsLabel}>Développeur</Text>
-                      <Text style={styles.detailsValue}>{selectedProject.developer}</Text>
-                    </View>
-                  )}
+                  <View style={styles.detailsSection}>
+                    <Text style={styles.detailsLabel}>Développeur</Text>
+                    <Text style={styles.detailsValue}>{selectedProject.developer || "Développeur non renseigné"}</Text>
+                  </View>
 
-                  {/* Type de projet */}
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>Type de projet</Text>
                     <Text style={styles.detailsValue}>{selectedProject.project_type}</Text>
                   </View>
 
-                  {/* Statut */}
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>Statut</Text>
-                    <Text style={styles.detailsValue}>{selectedProject.status || "Non spécifié"}</Text>
+                    <Text style={styles.detailsValue}>{selectedProject.status || "Statut non renseigné"}</Text>
                   </View>
 
-                  {/* Localisation */}
                   <View style={styles.detailsSection}>
                     <Text style={styles.detailsLabel}>Localisation</Text>
                     <Text style={styles.detailsValue}>
@@ -1772,7 +3803,6 @@ export default function MapScreen({
                     </Text>
                   </View>
 
-                  {/* Standing / Cible */}
                   {selectedProject.standing_cible && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Standing / Cible</Text>
@@ -1780,7 +3810,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Business model */}
                   {selectedProject.business_model && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Business model</Text>
@@ -1802,7 +3831,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Amenities */}
                   {selectedProject.amenities && selectedProject.amenities.length > 0 && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Amenities</Text>
@@ -1810,7 +3838,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Composantes */}
                   {selectedProject.project_components && selectedProject.project_components.length > 0 && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Composantes</Text>
@@ -1818,9 +3845,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* === DONNÉES PHYSIQUES === */}
-
-                  {/* Surface foncière totale */}
                   {selectedProject.surface_fonciere_totale && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Surface foncière totale</Text>
@@ -1828,7 +3852,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Surfaces foncières par type */}
                   {(selectedProject.surface_fonciere_collectif || selectedProject.surface_fonciere_villa || selectedProject.surface_fonciere_lot_villas) && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Surfaces foncières par type</Text>
@@ -1844,7 +3867,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Total d'unités global */}
                   {selectedProject.total_units && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Nombre total d'unités</Text>
@@ -1852,7 +3874,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Total d'unités par type */}
                   {(selectedProject.total_units_collectif || selectedProject.total_units_villa || selectedProject.total_units_lot_villas) && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Total d'unités par type</Text>
@@ -1868,7 +3889,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Unités restantes global */}
                   {selectedProject.units_remaining_global && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Unités restantes</Text>
@@ -1876,7 +3896,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Unités restantes par type */}
                   {(selectedProject.units_remaining_collectif || selectedProject.units_remaining_villa || selectedProject.units_remaining_lot_villas) && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Unités restantes par type</Text>
@@ -1892,9 +3911,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* === DATES ET COMMERCIALISATION === */}
-
-                  {/* Date de livraison */}
                   {selectedProject.delivery_date && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Date de livraison</Text>
@@ -1902,7 +3918,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Début commercialisation */}
                   {selectedProject.start_commercial_date && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Début commercialisation</Text>
@@ -1910,7 +3925,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Taux de commercialisation global */}
                   {selectedProject.commercialization_rate_global && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Taux de commercialisation global</Text>
@@ -1918,7 +3932,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Taux de commercialisation par type */}
                   {(selectedProject.commercialization_rate_collectif || selectedProject.commercialization_rate_villa || selectedProject.commercialization_rate_lot_villas) && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Taux de commercialisation par type</Text>
@@ -1934,7 +3947,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Taux d'écoulement global */}
                   {selectedProject.sales_velocity_global && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Taux d'écoulement global</Text>
@@ -1942,7 +3954,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Taux d'écoulement par type */}
                   {(selectedProject.sales_velocity_collectif || selectedProject.sales_velocity_villa || selectedProject.sales_velocity_lot_villas) && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Taux d'écoulement par type</Text>
@@ -1958,9 +3969,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* === TYPOLOGIES ET PRIX === */}
-
-                  {/* Typologies disponibles */}
                   {projectTypologies.length > 0 && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Typologies disponibles</Text>
@@ -1973,24 +3981,16 @@ export default function MapScreen({
                           {(typology.surface_habitable_min != null || typology.surface_terrasse_min != null || typology.surface_terrain_min != null || typology.units != null || typology.cus != null || typology.cos != null || typology.hauteur || typology.pricing_comment) && (
                             <View style={styles.typologyDetails}>
                               {(typology.surface_habitable_min != null || typology.surface_habitable_max != null) && (
-                                <Text style={styles.typologyDetailText}>
-                                  Surface habitable: {formatRange(typology.surface_habitable_min, typology.surface_habitable_max)} m²
-                                </Text>
+                                <Text style={styles.typologyDetailText}>Surface habitable: {formatRange(typology.surface_habitable_min, typology.surface_habitable_max)} m²</Text>
                               )}
                               {(typology.surface_terrasse_min != null || typology.surface_terrasse_max != null) && (
-                                <Text style={styles.typologyDetailText}>
-                                  Surface terrasse: {formatRange(typology.surface_terrasse_min, typology.surface_terrasse_max)} m²
-                                </Text>
+                                <Text style={styles.typologyDetailText}>Surface terrasse: {formatRange(typology.surface_terrasse_min, typology.surface_terrasse_max)} m²</Text>
                               )}
                               {(typology.surface_terrain_min != null || typology.surface_terrain_max != null) && (
-                                <Text style={styles.typologyDetailText}>
-                                  Surface terrain: {formatRange(typology.surface_terrain_min, typology.surface_terrain_max)} m²
-                                </Text>
+                                <Text style={styles.typologyDetailText}>Surface terrain: {formatRange(typology.surface_terrain_min, typology.surface_terrain_max)} m²</Text>
                               )}
                               {typology.units != null && (
-                                <Text style={styles.typologyDetailText}>
-                                  Nombre d'unités: {typology.units}
-                                </Text>
+                                <Text style={styles.typologyDetailText}>Nombre d'unités: {typology.units}</Text>
                               )}
                               {(typology.cus != null || typology.cos != null || typology.hauteur) && (
                                 <Text style={styles.typologyDetailText}>
@@ -2002,9 +4002,7 @@ export default function MapScreen({
                                 </Text>
                               )}
                               {typology.pricing_comment && (
-                                <Text style={styles.typologyDetailText}>
-                                  {typology.pricing_comment}
-                                </Text>
+                                <Text style={styles.typologyDetailText}>{typology.pricing_comment}</Text>
                               )}
                             </View>
                           )}
@@ -2013,7 +4011,6 @@ export default function MapScreen({
                     </View>
                   )}
 
-                  {/* Gamme de prix */}
                   {projectTypologies.length > 0 && (
                     <View style={styles.detailsSection}>
                       <Text style={styles.detailsLabel}>Gamme de prix</Text>
@@ -2022,8 +4019,6 @@ export default function MapScreen({
                       </View>
                     </View>
                   )}
-
-                  {/* === DENSITÉ === */}
 
                   {projectDensity.length > 0 && (
                     <View style={styles.detailsSection}>
@@ -2037,8 +4032,6 @@ export default function MapScreen({
                       ))}
                     </View>
                   )}
-
-                  {/* === RETAIL === */}
 
                   {isRetailSelected && (projectRetail || projectExtendedDetails?.retail) && (
                     <>
@@ -2076,60 +4069,9 @@ export default function MapScreen({
                           <Text style={styles.detailsValue}>{projectRetail.mix_retail}</Text>
                         </View>
                       )}
-
-                      {(projectExtendedDetails?.retail?.shoppingCount || projectExtendedDetails?.retail?.shoppingBrands) && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Shopping</Text>
-                          {projectExtendedDetails?.retail?.shoppingCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.shoppingCount}</Text> : null}
-                          {projectExtendedDetails?.retail?.shoppingBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.shoppingBrands}</Text> : null}
-                        </View>
-                      )}
-
-                      {(projectExtendedDetails?.retail?.foodCount || projectExtendedDetails?.retail?.foodTypologies?.length || projectExtendedDetails?.retail?.foodBrands) && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Food & Beverage</Text>
-                          {projectExtendedDetails?.retail?.foodCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.foodCount}</Text> : null}
-                          {projectExtendedDetails?.retail?.foodTypologies?.length ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.foodTypologies.join(" • ")}</Text> : null}
-                          {projectExtendedDetails?.retail?.foodBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.foodBrands}</Text> : null}
-                        </View>
-                      )}
-
-                      {(projectExtendedDetails?.retail?.servicesCount || projectExtendedDetails?.retail?.servicesBrands) && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Services</Text>
-                          {projectExtendedDetails?.retail?.servicesCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.servicesCount}</Text> : null}
-                          {projectExtendedDetails?.retail?.servicesBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.servicesBrands}</Text> : null}
-                        </View>
-                      )}
-
-                      {(projectExtendedDetails?.retail?.leisureCount || projectExtendedDetails?.retail?.leisureBrands) && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Loisirs</Text>
-                          {projectExtendedDetails?.retail?.leisureCount ? <Text style={styles.detailsValue}>Enseignes: {projectExtendedDetails.retail.leisureCount}</Text> : null}
-                          {projectExtendedDetails?.retail?.leisureBrands ? <Text style={styles.detailsValue}>{projectExtendedDetails.retail.leisureBrands}</Text> : null}
-                        </View>
-                      )}
-
-                      {(projectExtendedDetails?.retail?.niveaux || projectExtendedDetails?.retail?.parkingPlaces || projectExtendedDetails?.retail?.parkingType || projectExtendedDetails?.retail?.parkingRatio) && (
-                        <View style={styles.detailsSection}>
-                          {projectExtendedDetails?.retail?.niveaux ? <Text style={styles.detailsValue}>Niveaux: {projectExtendedDetails.retail.niveaux}</Text> : null}
-                          {projectExtendedDetails?.retail?.parkingPlaces ? <Text style={styles.detailsValue}>Places parking: {projectExtendedDetails.retail.parkingPlaces}</Text> : null}
-                          {projectExtendedDetails?.retail?.parkingType ? <Text style={styles.detailsValue}>Type parking: {projectExtendedDetails.retail.parkingType}</Text> : null}
-                          {projectExtendedDetails?.retail?.parkingRatio ? <Text style={styles.detailsValue}>Ratio parking: {projectExtendedDetails.retail.parkingRatio}</Text> : null}
-                        </View>
-                      )}
-
-                      {(projectExtendedDetails?.retail?.mainTenants || projectRetail?.enseignes || projectExtendedDetails?.retail?.occupancyRate) && (
-                        <View style={styles.detailsSection}>
-                          {projectExtendedDetails?.retail?.mainTenants ? <Text style={styles.detailsValue}>Locataires principaux: {projectExtendedDetails.retail.mainTenants}</Text> : null}
-                          {projectRetail?.enseignes ? <Text style={styles.detailsValue}>Enseignes clés: {projectRetail.enseignes}</Text> : null}
-                          {projectExtendedDetails?.retail?.occupancyRate ? <Text style={styles.detailsValue}>Taux d'occupation: {projectExtendedDetails.retail.occupancyRate}%</Text> : null}
-                        </View>
-                      )}
                     </>
                   )}
 
-                  {/* === BUREAU === */}
                   {isOfficeSelected && projectExtendedDetails?.office && (
                     <>
                       {projectExtendedDetails.office.openingDate ? (
@@ -2145,45 +4087,9 @@ export default function MapScreen({
                           <Text style={styles.detailsValue}>{projectExtendedDetails.office.officeType}</Text>
                         </View>
                       ) : null}
-
-                      {projectExtendedDetails.office.concept ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Concept</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.concept}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.office.target ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Cible</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.target}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.office.services ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Services</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.office.services}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.office.spaces && projectExtendedDetails.office.spaces.length > 0 && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Espaces de travail</Text>
-                          {projectExtendedDetails.office.spaces.map((space, index) => (
-                            <View key={`${space.space || "espace"}-${index}`} style={styles.typologyDetailItem}>
-                              <Text style={styles.typologyName}>{space.space || `Espace ${index + 1}`}</Text>
-                              {space.description ? <Text style={styles.typologyDetailText}>{space.description}</Text> : null}
-                              <Text style={styles.typologyDetailText}>{formatOfficeSpacePricing(space)}</Text>
-                              {space.pricingComment ? <Text style={styles.typologyDetailText}>{space.pricingComment}</Text> : null}
-                            </View>
-                          ))}
-                        </View>
-                      )}
                     </>
                   )}
 
-                  {/* === SANTE === */}
                   {isHealthSelected && projectExtendedDetails?.health && (
                     <>
                       {projectExtendedDetails.health.openingDate ? (
@@ -2192,86 +4098,9 @@ export default function MapScreen({
                           <Text style={styles.detailsValue}>{projectExtendedDetails.health.openingDate}</Text>
                         </View>
                       ) : null}
-
-                      {projectExtendedDetails.health.clinicTypology ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Typologie</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.clinicTypology}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.description ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Description</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.description}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.specialties ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Spécialités</Text>
-                          {projectExtendedDetails.health.specialties
-                            .split(/\n+/)
-                            .map((item) => item.trim())
-                            .filter(Boolean)
-                            .map((item, index) => (
-                              <Text key={`${item}-${index}`} style={styles.detailsValue}>• {item}</Text>
-                            ))}
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.beds ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Nombre de lits</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.beds}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.doctors ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Nombre de médecins</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.doctors}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.operatingBlocks ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Blocs opératoires</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.operatingBlocks}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.bedTypes?.length ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Typologies de lits</Text>
-                          <Text style={styles.detailsValue}>{formatCountTypePairs(projectExtendedDetails.health.bedTypes)}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.doctorTypes?.length ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Typologies de médecins</Text>
-                          <Text style={styles.detailsValue}>{formatCountTypePairs(projectExtendedDetails.health.doctorTypes)}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.equipments ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Équipements</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.equipments}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.health.complementaryRooms ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Salles complémentaires</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.health.complementaryRooms}</Text>
-                        </View>
-                      ) : null}
                     </>
                   )}
 
-                  {/* === HOTEL === */}
                   {isHotelSelected && projectExtendedDetails?.hotel && (
                     <>
                       {projectExtendedDetails.hotel.openingDate ? (
@@ -2280,304 +4109,68 @@ export default function MapScreen({
                           <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.openingDate}</Text>
                         </View>
                       ) : null}
-
-                      {projectExtendedDetails.hotel.subtype ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Sous-type</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.subtype}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.category ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Catégorie</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.category}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.bookingNote ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Note Booking</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.bookingNote}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.operator ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Opérateur</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.operator}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.investor ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Investisseur</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.investor}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.manager ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Gestionnaire</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.manager}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.renovationDate ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Date de rénovation</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.renovationDate}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.keys ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Clés</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.keys}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.floors ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Étages</Text>
-                          <Text style={styles.detailsValue}>{projectExtendedDetails.hotel.floors}</Text>
-                        </View>
-                      ) : null}
-
-                      {projectExtendedDetails.hotel.rooms && projectExtendedDetails.hotel.rooms.length > 0 && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Chambres</Text>
-                          {projectExtendedDetails.hotel.rooms.map((room, index) => (
-                            <Text key={`${room.type || "room"}-${index}`} style={styles.detailsValue}>
-                              • {room.type || `Type ${index + 1}`}{room.count ? ` - ${room.count}` : ""}{room.surface ? ` - ${room.surface} m²` : ""}{room.pricePerNight ? ` - ${room.pricePerNight} ${room.priceUnit || "MAD"}/nuit` : ""}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
-
-                      {projectExtendedDetails.hotel.fnb && projectExtendedDetails.hotel.fnb.length > 0 && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>F&B</Text>
-                          {projectExtendedDetails.hotel.fnb.map((item, index) => (
-                            <Text key={`${item.name || "fnb"}-${index}`} style={styles.detailsValue}>
-                              • {item.name || `Item ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
-
-                      {projectExtendedDetails.hotel.mice && projectExtendedDetails.hotel.mice.length > 0 && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>MICE</Text>
-                          {projectExtendedDetails.hotel.mice.map((item, index) => (
-                            <Text key={`${item.name || "mice"}-${index}`} style={styles.detailsValue}>
-                              • {item.name || `Espace ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.roomsCount ? ` - ${item.roomsCount} salles` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
-
-                      {projectExtendedDetails.hotel.leisure && projectExtendedDetails.hotel.leisure.length > 0 && (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Loisirs</Text>
-                          {projectExtendedDetails.hotel.leisure.map((item, index) => (
-                            <Text key={`${item.name || "loisir"}-${index}`} style={styles.detailsValue}>
-                              • {item.name || `Loisir ${index + 1}`}{item.type ? ` (${item.type})` : ""}{item.count ? ` - ${item.count}` : ""}{item.surface ? ` - ${item.surface} m²` : ""}{item.capacity ? ` - ${item.capacity}` : ""}{item.pricingAmount ? ` - ${item.pricingAmount} ${item.pricingUnit || "MAD"}` : ""}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
                     </>
                   )}
 
-                  {/* === SPORT === */}
                   {isSportSelected && projectExtendedDetails?.sport && (
                     <>
-                      {projectExtendedDetails.sport.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.sport.subtype}</Text></View> : null}
-                      {projectExtendedDetails.sport.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.sport.renovationDate}</Text></View> : null}
-                      {projectExtendedDetails.sport.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.sport.description}</Text></View> : null}
-                      {(projectExtendedDetails.sport.capacity || projectExtendedDetails.sport.positioning) ? (
+                      {(projectExtendedDetails.sport.openingDate || projectExtendedDetails.sport.creationDate || projectExtendedDetails.sport.renovationDate) ? (
                         <View style={styles.detailsSection}>
-                          {projectExtendedDetails.sport.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.sport.capacity}</Text> : null}
-                          {projectExtendedDetails.sport.positioning ? <Text style={styles.detailsValue}>Positionnement: {projectExtendedDetails.sport.positioning}</Text> : null}
-                        </View>
-                      ) : null}
-                      {(projectExtendedDetails.sport.targets?.length || projectExtendedDetails.sport.targetsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Clientèle cible</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.targets), projectExtendedDetails.sport.targetsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.sport.activities?.length || projectExtendedDetails.sport.activitiesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Activités</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.activities), projectExtendedDetails.sport.activitiesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.sport.equipments?.length || projectExtendedDetails.sport.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.equipments), projectExtendedDetails.sport.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.sport.services?.length || projectExtendedDetails.sport.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.services), projectExtendedDetails.sport.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.sport.fnb?.length || projectExtendedDetails.sport.fnbOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.sport.fnb), projectExtendedDetails.sport.fnbOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.sport.pricingMembershipFee || projectExtendedDetails.sport.pricingMonthly || projectExtendedDetails.sport.pricingAnnual || projectExtendedDetails.sport.pricingDaily || projectExtendedDetails.sport.pricingPerActivity) ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Tarification</Text>
-                          {projectExtendedDetails.sport.pricingMembershipFee ? <Text style={styles.detailsValue}>Frais d'adhésion: {projectExtendedDetails.sport.pricingMembershipFee}</Text> : null}
-                          {projectExtendedDetails.sport.pricingMonthly ? <Text style={styles.detailsValue}>Mensuel: {projectExtendedDetails.sport.pricingMonthly}</Text> : null}
-                          {projectExtendedDetails.sport.pricingAnnual ? <Text style={styles.detailsValue}>Annuel: {projectExtendedDetails.sport.pricingAnnual}</Text> : null}
-                          {projectExtendedDetails.sport.pricingDaily ? <Text style={styles.detailsValue}>Journalier: {projectExtendedDetails.sport.pricingDaily}</Text> : null}
-                          {projectExtendedDetails.sport.pricingPerActivity ? <Text style={styles.detailsValue}>Par activité: {projectExtendedDetails.sport.pricingPerActivity}</Text> : null}
-                        </View>
-                      ) : null}
-                      {(projectExtendedDetails.sport.currentMembers || projectExtendedDetails.sport.renewalRate || projectExtendedDetails.sport.labels || projectExtendedDetails.sport.businessModels?.length) ? (
-                        <View style={styles.detailsSection}>
-                          {projectExtendedDetails.sport.currentMembers ? <Text style={styles.detailsValue}>Membres actuels: {projectExtendedDetails.sport.currentMembers}</Text> : null}
-                          {projectExtendedDetails.sport.renewalRate ? <Text style={styles.detailsValue}>Taux de renouvellement: {projectExtendedDetails.sport.renewalRate}</Text> : null}
-                          {projectExtendedDetails.sport.labels ? <Text style={styles.detailsValue}>Labels: {projectExtendedDetails.sport.labels}</Text> : null}
-                          {projectExtendedDetails.sport.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.sport.businessModels)}</Text> : null}
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.sport.openingDate || projectExtendedDetails.sport.creationDate || projectExtendedDetails.sport.renovationDate}</Text>
                         </View>
                       ) : null}
                     </>
                   )}
 
-                  {/* === EDUCATION === */}
                   {isEducationSelected && projectExtendedDetails?.education && (
                     <>
-                      {projectExtendedDetails.education.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.subtype}</Text></View> : null}
-                      {projectExtendedDetails.education.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.renovationDate}</Text></View> : null}
-                      {projectExtendedDetails.education.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.description}</Text></View> : null}
-                      {(projectExtendedDetails.education.capacity || projectExtendedDetails.education.students || projectExtendedDetails.education.internationalStudents || projectExtendedDetails.education.teachers) ? (
+                      {(projectExtendedDetails.education.openingDate || projectExtendedDetails.education.creationDate || projectExtendedDetails.education.renovationDate) ? (
                         <View style={styles.detailsSection}>
-                          {projectExtendedDetails.education.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.education.capacity}</Text> : null}
-                          {projectExtendedDetails.education.students ? <Text style={styles.detailsValue}>Étudiants: {projectExtendedDetails.education.students}</Text> : null}
-                          {projectExtendedDetails.education.internationalStudents ? <Text style={styles.detailsValue}>Étudiants internationaux: {projectExtendedDetails.education.internationalStudents}</Text> : null}
-                          {projectExtendedDetails.education.teachers ? <Text style={styles.detailsValue}>Corps enseignant: {projectExtendedDetails.education.teachers}</Text> : null}
-                        </View>
-                      ) : null}
-                      {projectExtendedDetails.education.positioning ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Positionnement</Text><Text style={styles.detailsValue}>{projectExtendedDetails.education.positioning}</Text></View> : null}
-                      {(projectExtendedDetails.education.targets?.length || projectExtendedDetails.education.targetsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Public cible</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.targets), projectExtendedDetails.education.targetsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.education.programs?.length || projectExtendedDetails.education.programsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Programmes</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.programs), projectExtendedDetails.education.programsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.education.axes?.length || projectExtendedDetails.education.axesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Axes</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.axes), projectExtendedDetails.education.axesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.education.equipments?.length || projectExtendedDetails.education.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.equipments), projectExtendedDetails.education.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.education.services?.length || projectExtendedDetails.education.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.services), projectExtendedDetails.education.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {projectExtendedDetails.education.fnb?.length ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{formatArray(projectExtendedDetails.education.fnb)}</Text></View> : null}
-                      {(projectExtendedDetails.education.contractModels?.length || projectExtendedDetails.education.contractModelsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Modèle contractuel</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.education.contractModels), projectExtendedDetails.education.contractModelsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.education.partners || projectExtendedDetails.education.accreditations || projectExtendedDetails.education.businessModels?.length) ? (
-                        <View style={styles.detailsSection}>
-                          {projectExtendedDetails.education.partners ? <Text style={styles.detailsValue}>Partenaires: {projectExtendedDetails.education.partners}</Text> : null}
-                          {projectExtendedDetails.education.accreditations ? <Text style={styles.detailsValue}>Accréditations: {projectExtendedDetails.education.accreditations}</Text> : null}
-                          {projectExtendedDetails.education.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.education.businessModels)}</Text> : null}
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.education.openingDate || projectExtendedDetails.education.creationDate || projectExtendedDetails.education.renovationDate}</Text>
                         </View>
                       ) : null}
                     </>
                   )}
 
-                  {/* === ART ET CULTURE === */}
                   {isArtCultureSelected && projectExtendedDetails?.artCulture && (
                     <>
-                      {projectExtendedDetails.artCulture.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.subtype}</Text></View> : null}
-                      {projectExtendedDetails.artCulture.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.renovationDate}</Text></View> : null}
-                      {projectExtendedDetails.artCulture.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.description}</Text></View> : null}
-                      {(projectExtendedDetails.artCulture.operator || projectExtendedDetails.artCulture.capacity || projectExtendedDetails.artCulture.positioning) ? (
+                      {(projectExtendedDetails.artCulture.openingDate || projectExtendedDetails.artCulture.creationDate || projectExtendedDetails.artCulture.renovationDate) ? (
                         <View style={styles.detailsSection}>
-                          {projectExtendedDetails.artCulture.operator ? <Text style={styles.detailsValue}>Opérateur: {projectExtendedDetails.artCulture.operator}</Text> : null}
-                          {projectExtendedDetails.artCulture.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.artCulture.capacity}</Text> : null}
-                          {projectExtendedDetails.artCulture.positioning ? <Text style={styles.detailsValue}>Positionnement: {projectExtendedDetails.artCulture.positioning}</Text> : null}
-                        </View>
-                      ) : null}
-                      {(projectExtendedDetails.artCulture.targets?.length || projectExtendedDetails.artCulture.targetsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Public cible</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.targets), projectExtendedDetails.artCulture.targetsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.artCulture.activities?.length || projectExtendedDetails.artCulture.activitiesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Activités</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.activities), projectExtendedDetails.artCulture.activitiesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.artCulture.equipments?.length || projectExtendedDetails.artCulture.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.equipments), projectExtendedDetails.artCulture.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.artCulture.services?.length || projectExtendedDetails.artCulture.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.services), projectExtendedDetails.artCulture.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.artCulture.fnb?.length || projectExtendedDetails.artCulture.fnbOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.artCulture.fnb), projectExtendedDetails.artCulture.fnbOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {projectExtendedDetails.artCulture.spaceCapacities?.length ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Espaces & capacités</Text>
-                          {projectExtendedDetails.artCulture.spaceCapacities.map((space, index) => (
-                            <Text key={`${space.name || "space"}-${index}`} style={styles.detailsValue}>
-                              • {space.name || `Espace ${index + 1}`}{space.capacity ? ` - ${space.capacity}` : ""}{space.surface ? ` - ${space.surface} m²` : ""}
-                            </Text>
-                          ))}
-                        </View>
-                      ) : null}
-                      {(projectExtendedDetails.artCulture.highlights || projectExtendedDetails.artCulture.managementModels?.length || projectExtendedDetails.artCulture.managementModelsOther || projectExtendedDetails.artCulture.businessModels?.length || projectExtendedDetails.artCulture.partners?.length || projectExtendedDetails.artCulture.partnersOther || projectExtendedDetails.artCulture.labels?.length || projectExtendedDetails.artCulture.labelsOther) ? (
-                        <View style={styles.detailsSection}>
-                          {projectExtendedDetails.artCulture.highlights ? <Text style={styles.detailsValue}>Points forts: {projectExtendedDetails.artCulture.highlights}</Text> : null}
-                          {(projectExtendedDetails.artCulture.managementModels?.length || projectExtendedDetails.artCulture.managementModelsOther) ? <Text style={styles.detailsValue}>Management: {[formatArray(projectExtendedDetails.artCulture.managementModels), projectExtendedDetails.artCulture.managementModelsOther].filter(Boolean).join(" • ")}</Text> : null}
-                          {projectExtendedDetails.artCulture.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.artCulture.businessModels)}</Text> : null}
-                          {(projectExtendedDetails.artCulture.partners?.length || projectExtendedDetails.artCulture.partnersOther) ? <Text style={styles.detailsValue}>Partenaires: {[formatArray(projectExtendedDetails.artCulture.partners), projectExtendedDetails.artCulture.partnersOther].filter(Boolean).join(" • ")}</Text> : null}
-                          {(projectExtendedDetails.artCulture.labels?.length || projectExtendedDetails.artCulture.labelsOther) ? <Text style={styles.detailsValue}>Labels: {[formatArray(projectExtendedDetails.artCulture.labels), projectExtendedDetails.artCulture.labelsOther].filter(Boolean).join(" • ")}</Text> : null}
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.artCulture.openingDate || projectExtendedDetails.artCulture.creationDate || projectExtendedDetails.artCulture.renovationDate}</Text>
                         </View>
                       ) : null}
                     </>
                   )}
 
-                  {/* === LOISIR === */}
                   {isLeisureSelected && projectExtendedDetails?.leisure && (
                     <>
-                      {projectExtendedDetails.leisure.subtype ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Sous-type</Text><Text style={styles.detailsValue}>{projectExtendedDetails.leisure.subtype}</Text></View> : null}
-                      {projectExtendedDetails.leisure.renovationDate ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Date de rénovation</Text><Text style={styles.detailsValue}>{projectExtendedDetails.leisure.renovationDate}</Text></View> : null}
-                      {projectExtendedDetails.leisure.description ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Description</Text><Text style={styles.detailsValue}>{projectExtendedDetails.leisure.description}</Text></View> : null}
-                      {(projectExtendedDetails.leisure.builtSurface || projectExtendedDetails.leisure.capacity || projectExtendedDetails.leisure.annualVisitors || projectExtendedDetails.leisure.positioning) ? (
+                      {(projectExtendedDetails.leisure.openingDate || projectExtendedDetails.leisure.creationDate || projectExtendedDetails.leisure.renovationDate) ? (
                         <View style={styles.detailsSection}>
-                          {projectExtendedDetails.leisure.builtSurface ? <Text style={styles.detailsValue}>Surface bâtie: {projectExtendedDetails.leisure.builtSurface}</Text> : null}
-                          {projectExtendedDetails.leisure.capacity ? <Text style={styles.detailsValue}>Capacité: {projectExtendedDetails.leisure.capacity}</Text> : null}
-                          {projectExtendedDetails.leisure.annualVisitors ? <Text style={styles.detailsValue}>Visiteurs annuels: {projectExtendedDetails.leisure.annualVisitors}</Text> : null}
-                          {projectExtendedDetails.leisure.positioning ? <Text style={styles.detailsValue}>Positionnement: {projectExtendedDetails.leisure.positioning}</Text> : null}
-                        </View>
-                      ) : null}
-                      {projectExtendedDetails.leisure.targets?.length ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Public cible</Text><Text style={styles.detailsValue}>{formatArray(projectExtendedDetails.leisure.targets)}</Text></View> : null}
-                      {(projectExtendedDetails.leisure.activities?.length || projectExtendedDetails.leisure.activitiesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Activités</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.leisure.activities), projectExtendedDetails.leisure.activitiesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.leisure.equipments?.length || projectExtendedDetails.leisure.equipmentsOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Équipements</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.leisure.equipments), projectExtendedDetails.leisure.equipmentsOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {(projectExtendedDetails.leisure.services?.length || projectExtendedDetails.leisure.servicesOther) ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>Services</Text><Text style={styles.detailsValue}>{[formatArray(projectExtendedDetails.leisure.services), projectExtendedDetails.leisure.servicesOther].filter(Boolean).join(" • ")}</Text></View> : null}
-                      {projectExtendedDetails.leisure.fnb?.length ? <View style={styles.detailsSection}><Text style={styles.detailsLabel}>F&B</Text><Text style={styles.detailsValue}>{formatArray(projectExtendedDetails.leisure.fnb)}</Text></View> : null}
-                      {projectExtendedDetails.leisure.spaceCapacities?.length ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Espaces & capacités</Text>
-                          {projectExtendedDetails.leisure.spaceCapacities.map((space, index) => (
-                            <Text key={`${space.name || "space"}-${index}`} style={styles.detailsValue}>
-                              • {space.name || `Espace ${index + 1}`}{space.capacity ? ` - ${space.capacity}` : ""}{space.surface ? ` - ${space.surface} m²` : ""}
-                            </Text>
-                          ))}
-                        </View>
-                      ) : null}
-                      {(projectExtendedDetails.leisure.highlights || projectExtendedDetails.leisure.seasonality?.length || projectExtendedDetails.leisure.managementModels?.length || projectExtendedDetails.leisure.managementModelsOther || projectExtendedDetails.leisure.businessModels?.length || projectExtendedDetails.leisure.partners || projectExtendedDetails.leisure.labels) ? (
-                        <View style={styles.detailsSection}>
-                          {projectExtendedDetails.leisure.highlights ? <Text style={styles.detailsValue}>Points forts: {projectExtendedDetails.leisure.highlights}</Text> : null}
-                          {projectExtendedDetails.leisure.seasonality?.length ? <Text style={styles.detailsValue}>Saisonnalité: {formatArray(projectExtendedDetails.leisure.seasonality)}</Text> : null}
-                          {(projectExtendedDetails.leisure.managementModels?.length || projectExtendedDetails.leisure.managementModelsOther) ? <Text style={styles.detailsValue}>Management: {[formatArray(projectExtendedDetails.leisure.managementModels), projectExtendedDetails.leisure.managementModelsOther].filter(Boolean).join(" • ")}</Text> : null}
-                          {projectExtendedDetails.leisure.businessModels?.length ? <Text style={styles.detailsValue}>Business model: {formatArray(projectExtendedDetails.leisure.businessModels)}</Text> : null}
-                          {projectExtendedDetails.leisure.partners ? <Text style={styles.detailsValue}>Partenaires: {projectExtendedDetails.leisure.partners}</Text> : null}
-                          {projectExtendedDetails.leisure.labels ? <Text style={styles.detailsValue}>Labels: {projectExtendedDetails.leisure.labels}</Text> : null}
-                        </View>
-                      ) : null}
-                      {(projectExtendedDetails.leisure.pricingAdult || projectExtendedDetails.leisure.pricingChild || projectExtendedDetails.leisure.pricingFamily || projectExtendedDetails.leisure.pricingAnnualPass || projectExtendedDetails.leisure.pricingGroup || projectExtendedDetails.leisure.pricingCorporate || projectExtendedDetails.leisure.pricingPerActivity) ? (
-                        <View style={styles.detailsSection}>
-                          <Text style={styles.detailsLabel}>Tarification</Text>
-                          {projectExtendedDetails.leisure.pricingAdult ? <Text style={styles.detailsValue}>Adulte: {projectExtendedDetails.leisure.pricingAdult}</Text> : null}
-                          {projectExtendedDetails.leisure.pricingChild ? <Text style={styles.detailsValue}>Enfant: {projectExtendedDetails.leisure.pricingChild}</Text> : null}
-                          {projectExtendedDetails.leisure.pricingFamily ? <Text style={styles.detailsValue}>Famille: {projectExtendedDetails.leisure.pricingFamily}</Text> : null}
-                          {projectExtendedDetails.leisure.pricingAnnualPass ? <Text style={styles.detailsValue}>Pass annuel: {projectExtendedDetails.leisure.pricingAnnualPass}</Text> : null}
-                          {projectExtendedDetails.leisure.pricingGroup ? <Text style={styles.detailsValue}>Groupe: {projectExtendedDetails.leisure.pricingGroup}</Text> : null}
-                          {projectExtendedDetails.leisure.pricingCorporate ? <Text style={styles.detailsValue}>Corporate: {projectExtendedDetails.leisure.pricingCorporate}</Text> : null}
-                          {projectExtendedDetails.leisure.pricingPerActivity ? <Text style={styles.detailsValue}>Par activité: {projectExtendedDetails.leisure.pricingPerActivity}</Text> : null}
+                          <Text style={styles.detailsLabel}>Date d'ouverture</Text>
+                          <Text style={styles.detailsValue}>{projectExtendedDetails.leisure.openingDate || projectExtendedDetails.leisure.creationDate || projectExtendedDetails.leisure.renovationDate}</Text>
                         </View>
                       ) : null}
                     </>
                   )}
-                </>
-              )}
 
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => {
-                  closeDetailsModal();
-                  router.push(`/(tabs)/AddProject?projectId=${selectedProject?.id}`);
-                }}
-              >
-                <Text style={styles.editButtonText}>Modifier ce projet</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity style={styles.editButton} onPress={() => {
+                    closeDetailsModal();
+                    router.push(`/(tabs)/AddProject?projectId=${selectedProject.id}`);
+                  }}>
+                    <Text style={styles.editButtonText}>Modifier ce projet</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => {
-                  if (!selectedProject?.id) return;
-                  deleteProject(selectedProject.id);
-                }}
-              >
-                <Text style={styles.deleteButtonText}>Supprimer ce projet</Text>
-              </TouchableOpacity>
-
-              <View style={{ height: 30 }} />
-            </ScrollView>
+                  <TouchableOpacity style={styles.deleteButton} onPress={() => {
+                    deleteProject(selectedProject.id);
+                  }}>
+                    <Text style={styles.deleteButtonText}>Supprimer ce projet</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </>
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -2910,15 +4503,1328 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(49, 132, 155, 0.14)",
   },
 
+  projectDetailShell: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
+    overflow: "hidden",
+  },
+
+  projectDetailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    gap: 14,
+    backgroundColor: "#F2FAFE",
+    borderBottomWidth: 1,
+    borderBottomColor: "#bfe1ec",
+  },
+
+  projectGalleryWrapper: {
+    position: "relative",
+    width: 420,
+    maxWidth: "38%",
+    height: 170,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: AppColors.ui.background,
+    backgroundColor: AppColors.gray.lightest,
+  },
+
+  projectGalleryPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#dfeff7",
+    paddingHorizontal: 18,
+  },
+
+  projectGalleryPlaceholderFrame: {
+    width: 86,
+    height: 76,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#4aa6c4",
+    backgroundColor: "#edf9ff",
+    position: "relative",
+    marginBottom: 12,
+  },
+
+  projectGalleryPlaceholderSun: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: "#4aa6c4",
+    right: 12,
+    top: 12,
+  },
+
+  projectGalleryPlaceholderHillA: {
+    position: "absolute",
+    left: 8,
+    right: 8,
+    bottom: 8,
+    height: 24,
+    backgroundColor: "#dfeff7",
+    borderRadius: 12,
+    transform: [{ skewY: "-18deg" }],
+  },
+
+  projectGalleryPlaceholderHillB: {
+    position: "absolute",
+    left: 24,
+    right: 18,
+    bottom: 10,
+    height: 22,
+    backgroundColor: "#cfeaf7",
+    borderRadius: 12,
+    transform: [{ skewY: "18deg" }],
+  },
+
+  projectGalleryPlaceholderTitle: {
+    color: AppColors.primary.main,
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "center",
+  },
+
+  projectGalleryPlaceholderText: {
+    color: AppColors.primary.main,
+    fontSize: 14,
+    fontWeight: "400",
+    fontFamily: "Century Gothic",
+    textAlign: "center",
+    marginTop: 4,
+  },
+
+  projectDetailImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  projectImageCounter: {
+    position: "absolute",
+    left: 12,
+    bottom: 12,
+    backgroundColor: "rgba(11, 29, 39, 0.72)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+
+  projectImageCounterText: {
+    color: AppColors.ui.background,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectImageArrows: {
+    position: "absolute",
+    right: 16,
+    bottom: 16,
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  projectImageArrowButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  projectImageArrowText: {
+    color: AppColors.ui.background,
+    fontSize: 26,
+    fontWeight: "700",
+    lineHeight: 26,
+  },
+
+  projectSummaryColumn: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 8,
+  },
+
+  projectStatusBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "#dfeef9",
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: AppColors.primary.light,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+
+  projectStatusBadgeText: {
+    color: AppColors.primary.main,
+    fontFamily: "Century Gothic",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  projectSummaryTitle: {
+    color: AppColors.primary.main,
+    fontSize: 30,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    marginBottom: 10,
+  },
+
+  projectSummaryLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 6,
+  },
+
+  projectSummaryIconPlaceholder: {
+    width: 16,
+    height: 16,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: AppColors.primary.main,
+    backgroundColor: "rgba(49, 132, 155, 0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  projectSummaryIconImage: {
+    width: 10,
+    height: 10,
+  },
+
+  projectSummaryIconPin: {
+    borderRadius: 9,
+    backgroundColor: "rgba(49, 132, 155, 0.18)",
+  },
+
+  projectSummaryIconBuilding: {
+    borderRadius: 4,
+  },
+
+  projectSummaryText: {
+    color: "#0b6e8c",
+    fontSize: 15,
+    fontWeight: "500",
+    fontFamily: "Century Gothic",
+  },
+
+  projectMiniMapContainer: {
+    width: 180,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  projectMiniMapCard: {
+    width: 178,
+    height: 118,
+    borderRadius: 16,
+    backgroundColor: "rgba(146, 210, 229, 0.14)",
+    borderWidth: 1,
+    borderColor: "#99d7ea",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+
+  projectMiniMapPin: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#0b7ea2",
+    position: "absolute",
+    top: 48,
+    left: 82,
+    borderWidth: 4,
+    borderColor: AppColors.ui.background,
+  },
+
+  projectMiniMapText: {
+    position: "absolute",
+    bottom: 18,
+    color: "#0b6e8c",
+    fontSize: 17,
+    fontWeight: "600",
+    fontFamily: "Century Gothic",
+  },
+
+  projectCloseButton: {
+    position: "absolute",
+    right: 16,
+    top: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  projectCloseButtonText: {
+    color: AppColors.primary.main,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+
+  projectTabsRow: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1,
+    borderBottomColor: "#9cd3e6",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+
+  projectTabButton: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#7ec6dc",
+    backgroundColor: "#F2FAFE",
+  },
+
+  projectTabButtonActive: {
+    backgroundColor: "#0b879e",
+    borderColor: "#0b879e",
+  },
+
+  projectTabIconSlot: {
+    width: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  projectTabIcon: {
+    color: "#0c7ea3",
+    fontSize: 15,
+    fontWeight: "700",
+    lineHeight: 15,
+  },
+
+  projectTabIconImage: {
+    width: 16,
+    height: 16,
+  },
+
+  projectTabIconActive: {
+    color: "#ffffff",
+  },
+
+  projectTabText: {
+    color: "#0c7ea3",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "center",
+  },
+
+  projectTabTextActive: {
+    color: "#ffffff",
+  },
+
+  projectCollectiveSectionBlock: {
+    marginBottom: 16,
+  },
+
+  projectTabContentScroll: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
+
+  projectTabContentContainer: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+
+  projectOverviewGrid: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 12,
+    alignItems: "stretch",
+  },
+
+  projectOverviewCard: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(64, 180, 220, 0.42)",
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    minHeight: 110,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: "rgba(40, 150, 195, 0.16)",
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  projectOverviewCardIconWrap: {
+    width: 50,
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 0,
+    backgroundColor: "#EAF9FF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+
+  explorerIcon: {
+    width: 28,
+    height: 28,
+    tintColor: "#0d7ea4",
+  },
+  explorerIconSmall: {
+    width: 18,
+    height: 18,
+  },
+  explorerIconTiny: {
+    width: 14,
+    height: 14,
+  },
+  explorerIconMedium: {
+    width: 20,
+    height: 20,
+  },
+
+  projectOverviewCardContent: {
+    flex: 1,
+    justifyContent: "center",
+  },
+
+  projectOverviewCardLabel: {
+    color: "#2a7a9a",
+    fontSize: 13,
+    fontWeight: "500",
+    fontFamily: "Century Gothic",
+    marginBottom: 4,
+    lineHeight: 17,
+  },
+
+  projectOverviewCardValue: {
+    color: "#0a5e7a",
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    lineHeight: 22,
+    flexShrink: 1,
+  },
+
+  projectCharacteristicsContainer: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(64, 180, 220, 0.42)",
+    borderRadius: 18,
+    overflow: "hidden",
+    marginTop: 0,
+    shadowColor: "rgba(40, 150, 195, 0.22)",
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
+  },
+
+  projectCharacteristicsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#FFFFFF",
+    borderBottomWidth: 0,
+    borderBottomColor: "transparent",
+  },
+
+  projectCharacteristicsTitleIconWrap: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+
+  projectCharacteristicsTitleIcon: {
+    color: "#0c7ea3",
+    fontSize: 24,
+    fontWeight: "700",
+    lineHeight: 24,
+  },
+
+  projectCharacteristicsTitle: {
+    color: AppColors.primary.main,
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectCharacteristicsGrid: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
+  },
+
+  projectCharacteristicsBlock: {
+    flex: 1,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    borderColor: "transparent",
+    borderRadius: 0,
+    overflow: "visible",
+  },
+
+  projectCharacteristicsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 54,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: "#EAF9FF",
+    marginBottom: 12,
+  },
+
+  projectCharacteristicsRowLast: {
+    marginBottom: 0,
+  },
+
+  projectCharacteristicsLabelWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 12,
+    paddingRight: 12,
+    borderRightWidth: 1,
+    borderRightColor: "rgba(64, 180, 220, 0.24)",
+  },
+
+  projectCharacteristicsItemIconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+    borderRadius: 6,
+  },
+
+  projectCharacteristicsItemIcon: {
+    color: "#0c7ea3",
+    fontSize: 22,
+    fontWeight: "700",
+    lineHeight: 22,
+  },
+
+  projectCharacteristicsLabel: {
+    color: AppColors.primary.main,
+    fontSize: 16,
+    fontWeight: "500",
+    fontFamily: "Century Gothic",
+    flexShrink: 1,
+    lineHeight: 18,
+  },
+
+  projectCharacteristicsValue: {
+    color: "#0b6f8f",
+    fontSize: 17,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "right",
+    flexShrink: 1,
+    lineHeight: 20,
+  },
+
+  projectSectionTitle: {
+    color: AppColors.primary.main,
+    fontSize: 24,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    marginBottom: 18,
+  },
+
+  projectEquipmentLayout: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "stretch",
+  },
+
+  projectEquipmentBlock: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(64, 180, 220, 0.42)",
+    borderRadius: 18,
+    overflow: "hidden",
+    paddingBottom: 16,
+    shadowColor: "rgba(40, 150, 195, 0.16)",
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  projectEquipmentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 0,
+    borderBottomColor: "transparent",
+  },
+
+  projectEquipmentIconWrap: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+
+  projectEquipmentTitleIcon: {
+    width: 26,
+    height: 26,
+    tintColor: "#0d7ea4",
+  },
+
+  projectEquipmentIcon: {
+    color: "#0c7ea3",
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  projectEquipmentTitle: {
+    color: AppColors.primary.main,
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectComponentGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+
+  projectComponentItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(64, 180, 220, 0.45)",
+    backgroundColor: "#F3FBFF",
+    minHeight: 42,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  projectComponentItemText: {
+    color: AppColors.primary.main,
+    fontSize: 15,
+    fontWeight: "500",
+    fontFamily: "Century Gothic",
+  },
+
+  projectUnitsSectionContainer: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(64, 180, 220, 0.42)",
+    borderRadius: 18,
+    overflow: "hidden",
+    padding: 10,
+    shadowColor: "rgba(40, 150, 195, 0.16)",
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  projectUnitsTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingTop: 4,
+    paddingBottom: 10,
+  },
+
+  projectUnitsTitleIconWrap: {
+    width: 26,
+    height: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+
+  projectUnitsSectionIcon: {
+    width: 28,
+    height: 28,
+    tintColor: "#0d7ea4",
+  },
+
+  projectUnitsTitleIcon: {
+    color: "#0c7ea3",
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  projectUnitsTitle: {
+    color: AppColors.primary.main,
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectTypologyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
+  },
+
+  projectTypologyCard: {
+    flexBasis: "31%",
+    minWidth: 200,
+    maxWidth: "100%",
+    backgroundColor: "#F3FBFF",
+    borderWidth: 0,
+    borderColor: "transparent",
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    flexDirection: "row",
+    alignItems: "stretch",
+    minHeight: 146,
+    shadowColor: "rgba(40, 150, 195, 0.08)",
+    shadowOpacity: 1,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+
+  projectTypologyPlanZone: {
+    flex: 2.4,
+    minWidth: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "rgba(12, 126, 163, 0.05)",
+    borderRadius: 10,
+    marginLeft: 10,
+    marginRight: 8,
+  },
+
+  projectTypologyIconWrap: {
+    width: 36,
+    height: 36,
+    borderWidth: 0,
+    borderColor: "transparent",
+    borderRadius: 10,
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 6,
+  },
+
+  projectTypologyIconImage: {
+    width: 30,
+    height: 30,
+    tintColor: "#0d7ea4",
+  },
+
+  projectTypologyIcon: {
+    color: "#0c7ea3",
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  projectTypologyName: {
+    color: "#0b6f8f",
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "center",
+    flexShrink: 1,
+    maxWidth: "100%",
+  },
+
+  projectTypologyDivider: {
+    width: 1,
+    backgroundColor: "rgba(64, 180, 220, 0.22)",
+    marginVertical: 8,
+    alignSelf: "stretch",
+  },
+
+  projectTypologySurfaceZone: {
+    flex: 4.2,
+    justifyContent: "center",
+    paddingVertical: 4,
+    paddingLeft: 12,
+    minWidth: 0,
+  },
+
+  projectTypologyMetaLine: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: "500",
+    fontFamily: "Century Gothic",
+  },
+
+  projectTypologyMetaLabel: {
+    color: AppColors.primary.main,
+    fontWeight: "500",
+  },
+
+  projectTypologyMetaValue: {
+    color: "#0b6f8f",
+    fontWeight: "700",
+  },
+
+  projectTypologyPriceZone: {
+    flex: 2.6,
+    justifyContent: "center",
+    alignItems: "flex-end",
+    paddingLeft: 10,
+    paddingRight: 12,
+    minWidth: 0,
+  },
+
+  projectTypologyPriceLabel: {
+    color: "#FF0066",
+    fontSize: 11,
+    fontWeight: "600",
+    fontFamily: "Century Gothic",
+    marginBottom: 2,
+    textAlign: "right",
+  },
+
+  projectTypologyPriceValue: {
+    color: "#FF0066",
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "right",
+    marginBottom: 8,
+  },
+
+  projectTypologyStartLabel: {
+    color: "#d54b9d",
+    fontSize: 10,
+    fontWeight: "600",
+    fontFamily: "Century Gothic",
+    marginBottom: 2,
+  },
+
+  projectTypologyStartValue: {
+    color: "#d54b9d",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "right",
+  },
+
+  emptyStateBox: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: "#F2FAFE",
+    borderWidth: 1,
+    borderColor: "#8ad0e5",
+  },
+
+  emptyStateText: {
+    color: AppColors.primary.main,
+    fontSize: 16,
+    fontFamily: "Century Gothic",
+  },
+
+  projectGlobalPriceBox: {
+    marginTop: 8,
+    backgroundColor: "#EAF9FF",
+    borderRadius: 14,
+    borderWidth: 0,
+    borderColor: "transparent",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    shadowColor: "rgba(40, 150, 195, 0.08)",
+    shadowOpacity: 1,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+
+  projectGlobalPriceLabelWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexShrink: 1,
+  },
+
+  projectGlobalPriceIconWrap: {
+    width: 24,
+    height: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+
+  projectGlobalPriceIconImage: {
+    width: 24,
+    height: 24,
+    tintColor: "#0d7ea4",
+  },
+
+  projectGlobalPriceIcon: {
+    color: "#0c7ea3",
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+
+  projectGlobalPriceLabel: {
+    color: AppColors.primary.main,
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectGlobalPriceValue: {
+    color: "#0b6f8f",
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    textAlign: "right",
+    flexShrink: 1,
+  },
+
+  projectDocumentsLayout: {
+    flexDirection: "row",
+    gap: 16,
+    alignItems: "stretch",
+  },
+
+  projectDocumentPanel: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    overflow: "hidden",
+    minHeight: 240,
+    borderWidth: 1,
+    borderColor: "rgba(64, 180, 220, 0.42)",
+    shadowColor: "rgba(40, 150, 195, 0.16)",
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+
+  projectDocumentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 0,
+    borderBottomColor: "transparent",
+  },
+
+  projectDocumentHeaderIconWrap: {
+    width: 30,
+    height: 30,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+
+  projectDocumentHeaderIcon: {
+    color: "#0c7ea3",
+    fontSize: 18,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+
+  projectDocumentHeaderTitle: {
+    color: AppColors.primary.main,
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectSectionHeaderIcon: {
+    width: 26,
+    height: 26,
+  },
+
+  projectDocumentList: {
+    padding: 10,
+  },
+
+  projectDocumentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: 12,
+    backgroundColor: "#EAF9FF",
+    borderWidth: 0,
+    borderColor: "transparent",
+  },
+
+  projectDocumentRowMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+  },
+
+  projectDocumentFileBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    padding: 3,
+  },
+
+  projectDocumentFileBadgeInner: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+
+  projectDocumentFileBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    color: "#FFFFFF",
+    lineHeight: 9,
+  },
+
+  projectDocumentInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+
+  projectDocumentName: {
+    color: AppColors.primary.main,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+    marginBottom: 2,
+  },
+
+  projectDocumentMeta: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontFamily: "Century Gothic",
+    opacity: 0.82,
+  },
+
+  projectDownloadButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#7ec6dc",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 124,
+    minHeight: 40,
+  },
+
+  projectDownloadButtonDisabled: {
+    backgroundColor: "#e5ebf0",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: AppColors.gray.light,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 124,
+    minHeight: 40,
+  },
+
+  projectDownloadIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 6,
+  },
+
+  projectDownloadButtonText: {
+    color: AppColors.primary.main,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectSourceUrlBox: {
+    backgroundColor: "#EAF9FF",
+    borderWidth: 0,
+    borderColor: "transparent",
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 10,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+
+  projectSourceLinkText: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontFamily: "Century Gothic",
+    lineHeight: 18,
+    flexShrink: 1,
+    flexWrap: "wrap",
+  },
+
+  projectSourceButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#7ec6dc",
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    marginHorizontal: 10,
+    marginBottom: 14,
+    alignSelf: "flex-start",
+  },
+
+  projectOpenSourceIcon: {
+    width: 16,
+    height: 16,
+    marginRight: 7,
+  },
+
+  projectSourceButtonIcon: {
+    color: AppColors.primary.main,
+    fontSize: 14,
+    fontWeight: "700",
+    marginRight: 6,
+  },
+
+  projectSourceButtonText: {
+    color: AppColors.primary.main,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectSourceNote: {
+    backgroundColor: "#EAF9FF",
+    borderRadius: 12,
+    borderWidth: 0,
+    borderColor: "transparent",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginHorizontal: 10,
+    marginBottom: 10,
+  },
+
+  projectSourceNoteHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+
+  projectSourceNoteIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+    borderWidth: 0,
+    borderColor: "transparent",
+  },
+
+  projectInfoIcon: {
+    width: 24,
+    height: 24,
+  },
+
+  projectSourceNoteIcon: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  projectSourceNoteTitle: {
+    color: AppColors.primary.main,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectSourceNoteText: {
+    color: AppColors.primary.main,
+    fontSize: 12,
+    fontFamily: "Century Gothic",
+    lineHeight: 18,
+  },
+
+  projectFooterActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: AppColors.gray.lighter,
+    gap: 18,
+    width: "100%",
+  },
+
+  projectMapAction: {
+    backgroundColor: AppColors.primary.main,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    width: 210,
+    minWidth: 180,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 48,
+    marginRight: "auto",
+  },
+
+  projectMapActionText: {
+    color: AppColors.ui.background,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectFooterActionGroup: {
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "flex-end",
+    marginLeft: "auto",
+    width: "68%",
+    flexShrink: 1,
+  },
+
+  projectEditAction: {
+    backgroundColor: AppColors.primary.main,
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 130,
+    maxWidth: 220,
+  },
+
+  projectEditActionText: {
+    color: AppColors.ui.background,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectExportAction: {
+    backgroundColor: "#0d9bb5",
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 120,
+    maxWidth: 180,
+  },
+
+  projectExportActionText: {
+    color: AppColors.ui.background,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
+  projectDeleteAction: {
+    backgroundColor: "#d93d3d",
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    flex: 1,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 140,
+    maxWidth: 220,
+  },
+
+  projectDeleteActionText: {
+    color: AppColors.ui.background,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: "Century Gothic",
+  },
+
   detailsModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(49, 132, 155, 0.4)",
+    backgroundColor: "transparent",
     justifyContent: "flex-end",
     flexDirection: "column",
   },
 
   detailsCloseArea: {
-    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 
   detailsModalContent: {
@@ -2930,6 +5836,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 3,
     borderTopColor: AppColors.primary.light,
     paddingBottom: 0,
+    marginTop: 0,
   },
 
   detailsScrollView: {

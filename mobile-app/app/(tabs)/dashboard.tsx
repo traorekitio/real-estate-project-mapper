@@ -8,6 +8,27 @@ import { supabase } from "@/lib/supabase";
 
 const DASHBOARD_HERO_IMAGE = require("../../assets/images/home/hero-city.jpeg");
 const DASHBOARD_MAP_IMAGE = require("../../assets/images/home/hero-map.png");
+const RETAIL_DASHBOARD_HEADER_IMAGE = require("../../assets/images/Dashboard-retail/retail-dashboard-header.png");
+const RESIDENTIAL_DASHBOARD_HEADER_IMAGE = require("../../assets/images/Dashboard/residential-dashboard-header.png");
+const HOTEL_DASHBOARD_HEADER_IMAGE = require("../../assets/images/Dashboard-hotel/hotel-dashboard-header.png");
+const DASHBOARD_SEGMENT_COLLECTIF_IMAGE = require("../../assets/images/Dashboard/collectif.png");
+const DASHBOARD_SEGMENT_VILLA_IMAGE = require("../../assets/images/Dashboard/villa.png");
+const DASHBOARD_SEGMENT_LOT_IMAGE = require("../../assets/images/Dashboard/lot.png");
+const DASHBOARD_LOGO_COLLECTIF_IMAGE = require("../../assets/images/Dashboard/logo-collectif.png");
+const DASHBOARD_LOGO_VILLA_IMAGE = require("../../assets/images/Dashboard/logo-villa.png");
+const DASHBOARD_LOGO_LOT_IMAGE = require("../../assets/images/Dashboard/logo-lot.png");
+const RETAIL_ICON_ACTIFS_ANALYSES_IMAGE = require("../../assets/images/Dashboard-retail/logo-Actifs analyses.png");
+const RETAIL_ICON_GLA_EXISTANTE_IMAGE = require("../../assets/images/Dashboard-retail/logo-GLA existante.png");
+const RETAIL_ICON_GLA_PIPELINE_IMAGE = require("../../assets/images/Dashboard-retail/logo-GLA pipeline.png");
+const RETAIL_ICON_CROISSANCE_POTENTIELLE_IMAGE = require("../../assets/images/Dashboard-retail/logo-Croissance potentielle.png");
+const RETAIL_ICON_TAUX_OCCUPATION_IMAGE = require("../../assets/images/Dashboard-retail/logo-Taux d'occupation moyen.png");
+const RETAIL_ICON_ENSEIGNES_TOTALES_IMAGE = require("../../assets/images/Dashboard-retail/logo-Enseignes totales.png");
+const HOTEL_ICON_ACTIFS_HOTEL_IMAGE = require("../../assets/images/Dashboard-hotel/logo-Actifs hotel.png");
+const HOTEL_ICON_NOMBRE_CLES_IMAGE = require("../../assets/images/Dashboard-hotel/logo-Nombre de cles.png");
+const HOTEL_ICON_NOMBRE_CHAMBRES_IMAGE = require("../../assets/images/Dashboard-hotel/logo-Nombre de chambres.png");
+const HOTEL_ICON_CATEGORIES_IMAGE = require("../../assets/images/Dashboard-hotel/logo-Categories.png");
+const HOTEL_ICON_CLES_ACTIF_IMAGE = require("../../assets/images/Dashboard-hotel/logo-Cles actif.png");
+const HOTEL_ICON_MIX_SERVICES_IMAGE = require("../../assets/images/Dashboard-hotel/logo-Mix services.png");
 
 type ProjectRow = {
   id: string;
@@ -18,6 +39,8 @@ type ProjectRow = {
   developer: string | null;
   standing_cible: string | null;
   total_units: number | null;
+  commercialization_rate_global: number | null;
+  sales_velocity_global: number | null;
   delivery_date: string | null;
   project_type: string | null;
   status: string | null;
@@ -28,6 +51,34 @@ type RetailRow = {
   gla: number | null;
   opening_date: string | null;
   positionnement: string | null;
+};
+
+type TypologyRow = {
+  project_id: string;
+  typology_category: string | null;
+  typology: string | null;
+  surface_habitable_min: number | null;
+  surface_habitable_max: number | null;
+  surface_terrasse_min: number | null;
+  surface_terrasse_max: number | null;
+  surface_terrain_min: number | null;
+  surface_terrain_max: number | null;
+  cus: number | null;
+  cos: number | null;
+  hauteur: string | null;
+  pricing_type: string | null;
+  pricing_min: number | null;
+  pricing_max: number | null;
+  pricing_unit: string | null;
+  pricing_comment: string | null;
+  units: number | null;
+};
+
+type DensityRow = {
+  project_id: string;
+  density_type: string;
+  category: string | null;
+  density_value: number | null;
 };
 
 type ExtendedDetailsRow = {
@@ -112,6 +163,13 @@ const formatDecimal = (value: number, digits = 1) =>
     maximumFractionDigits: digits,
   });
 
+const formatStackedNumber = (value: number) => {
+  const rounded = Math.round(value);
+  const digits = formatNumber(rounded).replace(/\s/g, "");
+  if (digits.length <= 3) return formatNumber(rounded);
+  return `${digits.slice(0, 2)}\n${digits.slice(2)}`;
+};
+
 const formatRange = (min: number, max: number, unit = "MAD") => {
   if (!min && !max) return "-";
   if (min && max) return `${formatNumber(min)} - ${formatNumber(max)} ${unit}`;
@@ -131,12 +189,42 @@ const buildTopBars = (record: Record<string, number>, topN = 8): BarItem[] =>
     .slice(0, topN)
     .map(([label, value]) => ({ label, value }));
 
-const matchProjectType = (rawType: string | null, target: "retail" | "bureau" | "sante" | "hotel") => {
+const isResidentialProjectType = (rawType: string | null | undefined) => {
+  const type = (rawType || "").toLowerCase();
+  return type.includes("collectif") || type.includes("villa") || type.includes("lot");
+};
+
+const matchProjectType = (rawType: string | null, target: "retail" | "bureau" | "sante" | "hotel" | "residential") => {
   const type = (rawType || "").toLowerCase();
   if (target === "retail") return type.includes("retail");
   if (target === "bureau") return type.includes("bureau");
   if (target === "sante") return type.includes("sant");
+  if (target === "residential") return isResidentialProjectType(rawType);
   return type.includes("hotel") || type.includes("hôtel");
+};
+
+const normalizeResidentialCategory = (value: unknown) => {
+  const normalized = normalizeText(typeof value === "string" ? value : "");
+  if (!normalized) return "Non specifie";
+  if (normalized.includes("collectif")) return "Collectif";
+  if (normalized.includes("lot")) return "Lot de villas";
+  if (normalized.includes("villa")) return "Villa";
+  return typeof value === "string" && value.trim() ? value.trim() : "Non specifie";
+};
+
+const normalizeTypologyLabel = (value: unknown) => {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return "Non specifie";
+  const normalized = normalizeText(raw);
+  if (normalized.includes("f2") || normalized.includes("studio")) return "F2/Studio";
+  if (normalized === "f3") return "F3";
+  if (normalized === "f4") return "F4";
+  if (normalized === "f5" || normalized.includes("f5 ")) return "F5";
+  if (normalized.includes("f5**") || normalized.includes("f5++")) return "F5**";
+  if (normalized.includes("villa jumelee")) return "Villa jumelée";
+  if (normalized.includes("villa individuelle")) return "villa isolée";
+  if (normalized.includes("villa en bande")) return "Villa en bande";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 };
 
 const normalizeHotelTypology = (category: unknown, standing: unknown) => {
@@ -198,7 +286,7 @@ const describeArc = (x: number, y: number, radius: number, startAngle: number, e
   ].join(" ");
 };
 
-const PieChart = ({ title, slices, containerStyle }: { title: string; slices: SliceItem[]; containerStyle?: any }) => {
+const PieChart = ({ title, slices, containerStyle, totalLabel }: { title: string; slices: SliceItem[]; containerStyle?: any; totalLabel?: string }) => {
   const size = 200;
   const radius = 74;
   const center = size / 2;
@@ -214,13 +302,17 @@ const PieChart = ({ title, slices, containerStyle }: { title: string; slices: Sl
         <>
           <Svg width={size} height={size}>
             <G>
-              {slices.map((slice) => {
-                const angle = (slice.value / total) * 360;
-                const path = describeArc(center, center, radius, start, start + angle);
-                const arc = <Path key={`${slice.label}-${start}`} d={path} fill={slice.color} />;
-                start += angle;
-                return arc;
-              })}
+              {slices.length === 1 ? (
+                <Circle cx={center} cy={center} r={radius} fill={slices[0].color} />
+              ) : (
+                slices.map((slice) => {
+                  const angle = (slice.value / total) * 360;
+                  const path = describeArc(center, center, radius, start, start + angle);
+                  const arc = <Path key={`${slice.label}-${start}`} d={path} fill={slice.color} />;
+                  start += angle;
+                  return arc;
+                })
+              )}
               <Circle cx={center} cy={center} r={40} fill={AppColors.ui.background} />
             </G>
           </Svg>
@@ -233,7 +325,7 @@ const PieChart = ({ title, slices, containerStyle }: { title: string; slices: Sl
               </View>
             ))}
           </View>
-          <Text style={styles.chartFooter}>Total: {formatSquareMeters(total)}</Text>
+          <Text style={styles.chartFooter}>Total: {formatNumber(total)}{totalLabel ? ` ${totalLabel}` : ""}</Text>
         </>
       )}
     </View>
@@ -264,6 +356,187 @@ const HorizontalBars = ({ title, bars, formatter, containerStyle }: { title: str
     </View>
   );
 };
+
+const MinMidMaxBars = ({ title, bars, containerStyle }: { title: string; bars: Array<{ label: string; min: number; moy: number; max: number }>; containerStyle?: any }) => {
+  const maxValue = Math.max(...bars.flatMap((bar) => [bar.min, bar.moy, bar.max]), 1);
+  const series = [
+    { label: "Max", color: "#18BFE0", key: "max" as const },
+    { label: "Moy.", color: "#9CD5E0", key: "moy" as const },
+    { label: "Min", color: "#2F87A4", key: "min" as const },
+  ];
+
+  return (
+    <View style={[styles.chartCardWide, containerStyle]}>
+      <Text style={styles.chartTitle}>{title}</Text>
+      {bars.length === 0 ? (
+        <Text style={styles.emptyText}>Aucune donnee</Text>
+      ) : (
+        <>
+          <View style={styles.minMidMaxLegendRow}>
+            {series.map((item) => (
+              <View key={item.label} style={styles.minMidMaxLegendItem}>
+                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
+                <Text style={styles.legendText}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+          {bars.map((bar) => (
+            <View key={bar.label} style={styles.minMidMaxRow}>
+              <Text style={styles.minMidMaxLabel}>{bar.label}</Text>
+              <View style={styles.minMidMaxBarsWrap}>
+                {series.map((item) => {
+                  const value = bar[item.key];
+                  const width = `${Math.max((value / maxValue) * 100, value > 0 ? 4 : 0)}%`;
+                  return (
+                    <View key={`${bar.label}-${item.label}`} style={styles.minMidMaxBarLine}>
+                      <View style={[styles.minMidMaxBarFill, { width: width as any, backgroundColor: item.color }]} />
+                      <Text style={styles.minMidMaxBarValue}>{value > 0 ? formatNumber(Math.round(value)) : "-"}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+    </View>
+  );
+};
+
+const HistogramSingleSeries = ({ title, bars, formatter, containerStyle }: { title: string; bars: BarItem[]; formatter?: (value: number) => string; containerStyle?: any }) => {
+  const max = Math.max(...bars.map((item) => item.value), 1);
+  const barWidth = 78;
+  const barGap = 18;
+  const barHeightMax = 140;
+  const contentWidth = Math.max(bars.length * barWidth + Math.max(0, bars.length - 1) * barGap, 360);
+
+  return (
+    <View style={[styles.chartCardWide, containerStyle]}>
+      <Text style={styles.chartTitle}>{title}</Text>
+      {bars.length === 0 ? (
+        <Text style={styles.emptyText}>Aucune donnee</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.histogramScrollContent}>
+          <View style={[styles.histogramWrap, bars.length <= 3 ? styles.histogramWrapSpread : null, { width: contentWidth }]}> 
+            {bars.map((bar, idx) => {
+              const height = Math.max((bar.value / max) * barHeightMax, bar.value > 0 ? 6 : 0);
+              return (
+                <View key={`${bar.label}-${idx}`} style={[styles.histCol, { width: barWidth }]}> 
+                  <Text style={styles.histValue}>{formatter ? formatter(bar.value) : formatStackedNumber(bar.value)}</Text>
+                  <View style={styles.histTrack}><View style={[styles.histFill, { height }]} /></View>
+                  <Text style={styles.histLabel} numberOfLines={3}>{bar.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+const HistogramMinMoyMax = ({ title, bars, containerStyle }: { title: string; bars: Array<{ label: string; min: number; moy: number; max: number }>; containerStyle?: any }) => {
+  const max = Math.max(...bars.flatMap((item) => [item.min, item.moy, item.max]), 1);
+  const barWidth = 16;
+  const withinGap = 6;
+  const groupGap = 20;
+  const groupWidth = barWidth * 3 + withinGap * 2;
+  const contentWidth = Math.max(bars.length * groupWidth + Math.max(0, bars.length - 1) * groupGap, 360);
+  const colors = ["#1CB7D5", "#8BCEDB", "#2E7F9A"];
+
+  return (
+    <View style={[styles.chartCardWide, containerStyle]}>
+      <Text style={styles.chartTitle}>{title}</Text>
+      {bars.length === 0 ? (
+        <Text style={styles.emptyText}>Aucune donnee</Text>
+      ) : (
+        <>
+          <View style={styles.minMidMaxLegendRow}>
+            <View style={styles.minMidMaxLegendItem}><View style={[styles.legendDot, { backgroundColor: colors[0] }]} /><Text style={styles.legendText}>Max</Text></View>
+            <View style={styles.minMidMaxLegendItem}><View style={[styles.legendDot, { backgroundColor: colors[1] }]} /><Text style={styles.legendText}>Moy.</Text></View>
+            <View style={styles.minMidMaxLegendItem}><View style={[styles.legendDot, { backgroundColor: colors[2] }]} /><Text style={styles.legendText}>Min</Text></View>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.histogramScrollContent}>
+            <View style={[styles.histogramWrap, bars.length <= 3 ? styles.histogramWrapSpread : null, { width: contentWidth }]}> 
+              {bars.map((bar, idx) => {
+                const values = [bar.max, bar.moy, bar.min];
+                return (
+                  <View key={`${bar.label}-${idx}`} style={[styles.histGroupCol, { width: groupWidth }]}> 
+                    <View style={styles.histGroupValuesRow}>
+                      <Text style={styles.histGroupValue}>{formatStackedNumber(bar.max)}</Text>
+                      <Text style={styles.histGroupValue}>{formatStackedNumber(bar.moy)}</Text>
+                      <Text style={styles.histGroupValue}>{formatStackedNumber(bar.min)}</Text>
+                    </View>
+                    <View style={styles.histTrack}>
+                      <View style={styles.histGroupBarsRow}>
+                        {values.map((value, valueIdx) => {
+                          const height = Math.max((value / max) * 138, value > 0 ? 6 : 0);
+                          return <View key={`${bar.label}-${valueIdx}`} style={[styles.histGroupedFill, { height, width: barWidth, backgroundColor: colors[valueIdx] }]} />;
+                        })}
+                      </View>
+                    </View>
+                    <Text style={styles.histLabel} numberOfLines={2}>{bar.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        </>
+      )}
+    </View>
+  );
+};
+
+const ResidentialPriceOverviewMatrix = ({
+  rows,
+}: {
+  rows: Array<{ label: string; pricePerM2: number; surface: number; budget: number; flow: string; icon?: string }>;
+}) => (
+  <View style={styles.residentialPriceMatrixCard}>
+    <View style={styles.residentialPriceMatrixHeaderRow}>
+      <View style={styles.residentialPriceMatrixHeadCellFirst}><Text style={styles.residentialPriceMatrixHeadText}>Segment</Text></View>
+      <View style={styles.residentialPriceMatrixHeadCell}><Text style={styles.residentialPriceMatrixHeadText}>Prix moyen par m²</Text></View>
+      <View style={styles.residentialPriceMatrixHeadCell}><Text style={styles.residentialPriceMatrixHeadText}>Surface Moyenne</Text></View>
+      <View style={styles.residentialPriceMatrixHeadCell}><Text style={styles.residentialPriceMatrixHeadText}>Budget Moyen</Text></View>
+      <View style={styles.residentialPriceMatrixHeadCellLast}><Text style={styles.residentialPriceMatrixHeadText}>Taux d'ecoulement</Text></View>
+    </View>
+
+    {rows.map((row, index) => (
+      <View key={`${row.label}-${index}`} style={[styles.residentialPriceMatrixDataRow, index % 2 === 1 ? styles.residentialPriceMatrixDataAlt : styles.residentialPriceMatrixDataMain]}>
+        <View style={styles.residentialPriceMatrixCellSegment}>
+          <Text style={styles.residentialPriceMatrixSegment} numberOfLines={1}>
+            <Text style={styles.residentialPriceMatrixSegmentIcon}>{row.icon || "•"}</Text>
+            {` ${row.label}`}
+          </Text>
+        </View>
+
+        <View style={styles.residentialPriceMatrixCellData}>
+          <View style={styles.residentialPriceMatrixValuePill}>
+            <Text style={styles.residentialPriceMatrixValue}>{row.pricePerM2 > 0 ? `${formatNumber(Math.round(row.pricePerM2))} MAD/m²` : "-"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.residentialPriceMatrixCellData}>
+          <View style={styles.residentialPriceMatrixValuePill}>
+            <Text style={styles.residentialPriceMatrixValue}>{row.surface > 0 ? `${formatNumber(Math.round(row.surface))} m²` : "-"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.residentialPriceMatrixCellData}>
+          <View style={styles.residentialPriceMatrixValuePill}>
+            <Text style={styles.residentialPriceMatrixValue}>{row.budget > 0 ? `${formatNumber(Math.round(row.budget))} MAD` : "-"}</Text>
+          </View>
+        </View>
+
+        <View style={styles.residentialPriceMatrixCellDataLast}>
+          <View style={styles.residentialPriceMatrixValuePill}>
+            <Text style={styles.residentialPriceMatrixValue}>{row.flow || "-"}</Text>
+          </View>
+        </View>
+      </View>
+    ))}
+  </View>
+);
 
 const CompareBars = ({ title, leftLabel, leftValue, rightLabel, rightValue, containerStyle }: { title: string; leftLabel: string; leftValue: number; rightLabel: string; rightValue: number; containerStyle?: any }) => {
   const max = Math.max(leftValue, rightValue, 1);
@@ -434,6 +707,166 @@ const StandardPriceCategoryChart = ({ title, city, bars, containerStyle }: { tit
   );
 };
 
+const ResidentialSegmentTable = ({
+  title,
+  segment,
+  rows,
+}: {
+  title: string;
+  segment: "collectif" | "villa" | "lot";
+  rows: Array<{
+    project: string;
+    city: string;
+    quartier: string;
+    developer: string;
+    typologies: Record<string, { terrain: number; habitable: number; price: number; cus: number }>;
+    averageTerrain: number;
+    averageHabitable: number;
+    averagePrice: number;
+    averageCus: number;
+  }>;
+}) => {
+  const baseWidths = [140, 150, 170];
+  const columnPlan = segment === "collectif"
+    ? [
+        { label: "F2/Studio", width: 84, columns: ["Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+        { label: "F3", width: 84, columns: ["Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+        { label: "F4", width: 84, columns: ["Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+        { label: "F5", width: 84, columns: ["Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+        { label: "F6", width: 84, columns: ["Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+      ]
+    : segment === "villa"
+      ? [
+          { label: "Villa jumelée", width: 90, columns: ["Surface terrain m²", "Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+          { label: "villa isolée", width: 90, columns: ["Surface terrain m²", "Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+          { label: "Villa en bande", width: 90, columns: ["Surface terrain m²", "Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)"] },
+        ]
+      : [
+          { label: "Villa jumelée", width: 82, columns: ["Surface terrain m²", "Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)", "CUS"] },
+          { label: "villa isolée", width: 82, columns: ["Surface terrain m²", "Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)", "CUS"] },
+          { label: "Villa en bande", width: 82, columns: ["Surface terrain m²", "Surface habitable m²", "Prix de vente moyen MAD", "Prix au m² (MAD/m²)", "CUS"] },
+        ];
+
+  const columnPlanRows = columnPlan.map((group) => {
+    const sums = new Array(group.columns.length).fill(0);
+    const counts = new Array(group.columns.length).fill(0);
+    rows.forEach((row) => {
+      const metric = row.typologies[group.label] || { terrain: 0, habitable: 0, price: 0, cus: 0 };
+      const values = segment === "collectif"
+        ? [metric.habitable, metric.price, metric.habitable > 0 ? metric.price / metric.habitable : 0]
+        : segment === "villa"
+          ? [metric.terrain, metric.habitable, metric.price, metric.habitable > 0 ? metric.price / metric.habitable : 0]
+          : [metric.terrain, metric.habitable, metric.price, metric.habitable > 0 ? metric.price / metric.habitable : 0, metric.cus];
+      values.forEach((value, idx) => {
+        if (value > 0) {
+          sums[idx] += value;
+          counts[idx] += 1;
+        }
+      });
+    });
+    return {
+      ...group,
+      averages: sums.map((sum, idx) => (counts[idx] > 0 ? sum / counts[idx] : 0)),
+    };
+  });
+
+  const rowWidth = columnPlan.reduce((sum, group) => sum + group.width * group.columns.length, 0);
+  const tableWidth = baseWidths.reduce((sum, value) => sum + value, 0) + rowWidth;
+
+  return (
+    <View style={styles.tableInnerWrap}>
+      {title ? <Text style={styles.chartTitle}>{title}</Text> : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator>
+        <View style={[styles.tableWrap, { minWidth: tableWidth }]}> 
+          <View style={[styles.tableRow, styles.residentialBenchmarkMainHeaderRow]}>
+            <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkHeaderCell, { width: baseWidths[0] }]}>Projet</Text>
+            <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkHeaderCell, { width: baseWidths[1] }]}>Localisation</Text>
+            <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkHeaderCell, { width: baseWidths[2] }]}>Maître d'ouvrage</Text>
+            {columnPlan.map((group, idx) => (
+              <Text key={group.label} style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkGroupHeaderCell, idx === 0 ? styles.residentialBenchmarkGroupStartEdge : null, styles.residentialBenchmarkGroupEndEdge, { width: group.width * group.columns.length }]}>
+                {group.label}
+              </Text>
+            ))}
+          </View>
+
+          <View style={[styles.tableRow, styles.residentialBenchmarkSubHeaderRow]}>
+            <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkSubHeaderCell, { width: baseWidths[0] }]} />
+            <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkSubHeaderCell, { width: baseWidths[1] }]} />
+            <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkSubHeaderCell, { width: baseWidths[2] }]} />
+            {columnPlan.map((group) => (
+              <React.Fragment key={`sub-${group.label}`}>
+                {group.columns.map((column, idx) => (
+                  <Text
+                    key={`${group.label}-${column}`}
+                    style={[
+                      styles.tableCell,
+                      styles.residentialBenchmarkCellBase,
+                      styles.residentialBenchmarkSubHeaderCell,
+                      idx === 0 ? [styles.residentialBenchmarkSubHeaderCellStart, styles.residentialBenchmarkGroupStartEdge] : null,
+                      idx === group.columns.length - 1 ? [styles.residentialBenchmarkSubHeaderCellEnd, styles.residentialBenchmarkGroupEndEdge] : null,
+                      { width: group.width },
+                    ]}
+                  >
+                    {column}
+                  </Text>
+                ))}
+              </React.Fragment>
+            ))}
+          </View>
+
+          {rows.length === 0 ? (
+            <View style={styles.tableRow}>
+              <Text style={[styles.tableCell, { minWidth: 960 }]}>Aucune donnee</Text>
+            </View>
+          ) : rows.map((row, rowIdx) => (
+            <View key={`${row.project}-${rowIdx}`} style={[styles.tableRow, rowIdx % 2 === 1 ? styles.tableRowAlt : null]}>
+              {[row.project, `${row.city} / ${row.quartier || "-"}`, row.developer].map((cell, idx) => (
+                <Text key={`${row.project}-${idx}`} numberOfLines={1} style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkCell, { width: baseWidths[idx] }, idx === 0 ? styles.hotelBenchmarkEntityCell : null]}>
+                  {cell}
+                </Text>
+              ))}
+              {columnPlan.map((group) => {
+                const metric = row.typologies[group.label] || { terrain: 0, habitable: 0, price: 0, cus: 0 };
+                const cells = segment === "collectif"
+                  ? [metric.habitable, metric.price, metric.habitable > 0 ? metric.price / metric.habitable : 0]
+                  : segment === "villa"
+                    ? [metric.terrain, metric.habitable, metric.price, metric.habitable > 0 ? metric.price / metric.habitable : 0]
+                    : [metric.terrain, metric.habitable, metric.price, metric.habitable > 0 ? metric.price / metric.habitable : 0, metric.cus];
+                return cells.map((value, idx) => (
+                  <Text key={`${row.project}-${group.label}-${idx}`} style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkCell, styles.tableCellRight, idx === 0 ? styles.residentialBenchmarkGroupedCellStart : null, idx === cells.length - 1 ? styles.residentialBenchmarkGroupedCellEnd : null, { width: group.width }]}>
+                      {value > 0 ? (
+                        (segment === "collectif" && idx === 2) || (segment === "villa" && idx === 3) || (segment === "lot" && idx === 3)
+                          ? formatNumber(Math.round(value))
+                          : formatNumber(Math.round(value))
+                      ) : "-"}
+                  </Text>
+                ));
+              })}
+            </View>
+          ))}
+
+          {rows.length > 0 ? (
+            <View style={[styles.tableRow, styles.residentialAverageRow]}>
+              <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkCell, styles.hotelBenchmarkEntityCell, { width: baseWidths[0] }]}>Moyenne</Text>
+              <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkCell, { width: baseWidths[1] }]}>-</Text>
+              <Text style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkCell, { width: baseWidths[2] }]}>-</Text>
+              {columnPlanRows.map((group) => (
+                <React.Fragment key={`avg-${group.label}`}>
+                  {group.averages.map((value, idx) => (
+                    <Text key={`avg-${group.label}-${idx}`} style={[styles.tableCell, styles.residentialBenchmarkCellBase, styles.residentialBenchmarkCell, styles.tableCellRight, styles.hotelBenchmarkAverageCell, idx === 0 ? styles.residentialBenchmarkGroupedCellStart : null, idx === group.averages.length - 1 ? styles.residentialBenchmarkGroupedCellEnd : null, { width: group.width }]}>
+                      {value > 0 ? formatNumber(Math.round(value)) : "-"}
+                    </Text>
+                  ))}
+                </React.Fragment>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      </ScrollView>
+    </View>
+  );
+};
+
 const RadarChart = ({ title, axes, series }: { title: string; axes: string[]; series: RadarSeries[] }) => {
   const size = 260;
   const center = size / 2;
@@ -526,7 +959,7 @@ const ToolbarButton = ({ label }: { label: string }) => (
   </TouchableOpacity>
 );
 
-const MetricCard = ({ label, value, sublabel, accent }: { label: string; value: string; sublabel: string; accent?: "pink" | "green" | "purple" }) => (
+const MetricCard = ({ label, value, sublabel, accent, iconSource }: { label: string; value: string; sublabel: string; accent?: "pink" | "green" | "purple"; iconSource?: any }) => (
   <View style={styles.metricCard}>
     <Text style={styles.metricLabel}>{label}</Text>
     <View style={styles.metricValueRow}>
@@ -534,7 +967,9 @@ const MetricCard = ({ label, value, sublabel, accent }: { label: string; value: 
         <Text style={[styles.metricValue, accent === "pink" ? styles.metricValuePink : null, accent === "green" ? styles.metricValueGreen : null, accent === "purple" ? styles.metricValuePurple : null]}>{value}</Text>
         <Text style={styles.metricSubLabel}>{sublabel}</Text>
       </View>
-      <View style={[styles.metricIconBubble, accent === "pink" ? styles.metricIconPink : null, accent === "green" ? styles.metricIconGreen : null, accent === "purple" ? styles.metricIconPurple : null]}><Text style={styles.metricIconText}>[]</Text></View>
+      <View style={[styles.metricIconBubble, accent === "pink" ? styles.metricIconPink : null, accent === "green" ? styles.metricIconGreen : null, accent === "purple" ? styles.metricIconPurple : null]}>
+        {iconSource ? <Image source={iconSource} style={styles.metricIconImage} resizeMode="contain" /> : <Text style={styles.metricIconText}>[]</Text>}
+      </View>
     </View>
   </View>
 );
@@ -778,29 +1213,40 @@ export default function DashboardScreen() {
   const { width } = useWindowDimensions();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeDashboard, setActiveDashboard] = useState<"retail" | "bureau" | "sante" | "hotel">("retail");
+  const [activeDashboard, setActiveDashboard] = useState<"retail" | "bureau" | "sante" | "hotel" | "residential">("retail");
   const [retailCountryFilter, setRetailCountryFilter] = useState("all");
   const [retailCityFilter, setRetailCityFilter] = useState("all");
   const [retailTypologyFilter, setRetailTypologyFilter] = useState("all");
+  const [residentialComparativeCityFilter, setResidentialComparativeCityFilter] = useState("all");
+  const [residentialSegmentCityFilter, setResidentialSegmentCityFilter] = useState("all");
+  const [residentialTableCityFilter, setResidentialTableCityFilter] = useState("all");
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [retailRows, setRetailRows] = useState<RetailRow[]>([]);
   const [extendedRows, setExtendedRows] = useState<ExtendedDetailsRow[]>([]);
+  const [typologyRows, setTypologyRows] = useState<TypologyRow[]>([]);
+  const [densityRows, setDensityRows] = useState<DensityRow[]>([]);
 
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [projectsResponse, retailResponse, detailsResponse] = await Promise.all([
-        supabase.from("projects").select("id, name, country, city, quartier, developer, standing_cible, total_units, delivery_date, project_type, status"),
+      const [projectsResponse, retailResponse, detailsResponse, typologyResponse, densityResponse] = await Promise.all([
+        supabase.from("projects").select("id, name, country, city, quartier, developer, standing_cible, total_units, commercialization_rate_global, sales_velocity_global, delivery_date, project_type, status"),
         supabase.from("projects_retail").select("project_id, gla, opening_date, positionnement"),
         supabase.from("projects_extended_details").select("project_id, project_type, details"),
+        supabase.from("projects_typologies").select("project_id, typology_category, typology, surface_habitable_min, surface_habitable_max, surface_terrasse_min, surface_terrasse_max, surface_terrain_min, surface_terrain_max, cus, cos, hauteur, pricing_type, pricing_min, pricing_max, pricing_unit, pricing_comment, units"),
+        supabase.from("projects_density").select("project_id, density_type, category, density_value"),
       ]);
       if (projectsResponse.error) throw projectsResponse.error;
       if (retailResponse.error) throw retailResponse.error;
       if (detailsResponse.error) throw detailsResponse.error;
+      if (typologyResponse.error) throw typologyResponse.error;
+      if (densityResponse.error) throw densityResponse.error;
       setProjects((projectsResponse.data as ProjectRow[]) || []);
       setRetailRows((retailResponse.data as RetailRow[]) || []);
       setExtendedRows((detailsResponse.data as ExtendedDetailsRow[]) || []);
+      setTypologyRows((typologyResponse.data as TypologyRow[]) || []);
+      setDensityRows((densityResponse.data as DensityRow[]) || []);
     } catch (err: any) {
       setError(err?.message || "Erreur de chargement des dashboards");
     } finally {
@@ -1057,6 +1503,261 @@ export default function DashboardScreen() {
         return b.value - a.value;
       });
 
+    const residentialProjects = projects.filter((project) => matchProjectType(project.project_type, "residential"));
+    const residentialProjectMap = new Map(residentialProjects.map((project) => [project.id, project]));
+    const residentialCategoryCounts: Record<string, number> = { Collectif: 0, Villa: 0, "Lot de villas": 0 };
+    const residentialCityCounts: Record<string, number> = {};
+    const residentialPriceByCity: Record<string, { sum: number; count: number }> = {};
+    const residentialPriceByCategory: Record<string, { sum: number; count: number }> = {};
+    const residentialDensityByCategory: Record<string, { sum: number; count: number }> = {};
+    const residentialTypologyCounts: Record<string, number> = {};
+    const residentialTypologyGroups = new Set<string>();
+    const residentialBenchmarkRows: Array<{
+      category: string;
+      city: string;
+      quartier: string;
+      project: string;
+      developer: string;
+      units: number;
+      commercializationRate: number;
+      salesVelocity: number;
+      typologies: Record<string, { terrain: number; habitable: number; price: number; cus: number }>;
+      averageTerrain: number;
+      averageHabitable: number;
+      averagePrice: number;
+      averageCus: number;
+      priceMin: number;
+      priceMax: number;
+    }> = [];
+
+    const residentialTypologiesByProject = new Map<string, TypologyRow[]>();
+    typologyRows.forEach((row) => {
+      if (!residentialProjectMap.has(row.project_id)) return;
+      const list = residentialTypologiesByProject.get(row.project_id) || [];
+      list.push(row);
+      residentialTypologiesByProject.set(row.project_id, list);
+    });
+
+    densityRows.forEach((row) => {
+      if (!residentialProjectMap.has(row.project_id)) return;
+      const category = normalizeResidentialCategory(row.category || row.density_type);
+      if (!category || category === "Non specifie") return;
+      if (row.density_type !== "density" && row.density_type !== "CUS") return;
+      const bucket = residentialDensityByCategory[category] || { sum: 0, count: 0 };
+      const densityValue = parseNumeric(row.density_value);
+      if (densityValue > 0) {
+        bucket.sum += densityValue;
+        bucket.count += 1;
+        residentialDensityByCategory[category] = bucket;
+      }
+    });
+
+    residentialProjects.forEach((project) => {
+      const city = (project.city || "Non specifiee").trim() || "Non specifiee";
+      const quartier = (project.quartier || "Non specifie").trim() || "Non specifie";
+      const developer = (project.developer || "-").trim() || "-";
+      const projectType = (project.project_type || "").toLowerCase();
+      const categoryLabels = [
+        projectType.includes("collectif") ? "Collectif" : null,
+        projectType.includes("villa") && !projectType.includes("lot") ? "Villa" : null,
+        projectType.includes("lot") ? "Lot de villas" : null,
+      ].filter((value): value is string => Boolean(value));
+
+      if (categoryLabels.length === 0) {
+        categoryLabels.push(normalizeResidentialCategory(project.project_type));
+      }
+
+      categoryLabels.forEach((label) => {
+        residentialCategoryCounts[label] = (residentialCategoryCounts[label] || 0) + 1;
+      });
+      residentialCityCounts[city] = (residentialCityCounts[city] || 0) + 1;
+
+      const typologyMetricsByLabel: Record<string, { terrain: number; habitable: number; price: number; cus: number }> = {};
+      const projectTypologies = residentialTypologiesByProject.get(project.id) || [];
+
+      projectTypologies.forEach((row) => {
+        const typologyLabel = normalizeTypologyLabel(row.typology || row.typology_category);
+        const surfaceMin = parseNumeric(row.surface_habitable_min);
+        const surfaceMax = parseNumeric(row.surface_habitable_max);
+        const terrainMin = parseNumeric(row.surface_terrain_min);
+        const terrainMax = parseNumeric(row.surface_terrain_max);
+        const habitable = surfaceMax > 0 ? (surfaceMin + surfaceMax) / 2 : surfaceMin || parseNumeric(row.surface_terrasse_min) || parseNumeric(row.surface_terrain_min);
+        const terrain = terrainMax > 0 ? (terrainMin + terrainMax) / 2 : terrainMin;
+        const priceMin = parseNumeric(row.pricing_min);
+        const priceMax = parseNumeric(row.pricing_max);
+        const price = priceMax > 0 ? (priceMin + priceMax) / 2 : priceMin;
+        const cus = parseNumeric(row.cus);
+        const existing = typologyMetricsByLabel[typologyLabel] || { terrain: 0, habitable: 0, price: 0, cus: 0 };
+        typologyMetricsByLabel[typologyLabel] = {
+          terrain: existing.terrain + terrain,
+          habitable: existing.habitable + habitable,
+          price: existing.price + price,
+          cus: existing.cus + cus,
+        };
+        residentialTypologyCounts[typologyLabel] = (residentialTypologyCounts[typologyLabel] || 0) + 1;
+        residentialTypologyGroups.add(typologyLabel);
+
+        if (price > 0) {
+          const category = normalizeResidentialCategory(row.typology_category || project.project_type);
+          const byCategory = residentialPriceByCategory[category] || { sum: 0, count: 0 };
+          byCategory.sum += price;
+          byCategory.count += 1;
+          residentialPriceByCategory[category] = byCategory;
+
+          const byCity = residentialPriceByCity[city] || { sum: 0, count: 0 };
+          byCity.sum += price;
+          byCity.count += 1;
+          residentialPriceByCity[city] = byCity;
+        }
+      });
+
+      const rowHabitableValues = Object.values(typologyMetricsByLabel).map((item) => item.habitable).filter((value) => value > 0);
+      const rowTerrainValues = Object.values(typologyMetricsByLabel).map((item) => item.terrain).filter((value) => value > 0);
+      const rowCusValues = Object.values(typologyMetricsByLabel).map((item) => item.cus).filter((value) => value > 0);
+      const rowPriceValues = Object.values(typologyMetricsByLabel).map((item) => item.price).filter((value) => value > 0);
+      const projectPriceMin = Math.min(...rowPriceValues.filter((value) => value > 0));
+      const projectPriceMax = Math.max(...rowPriceValues.filter((value) => value > 0));
+
+      residentialBenchmarkRows.push({
+        category: categoryLabels.join(" / "),
+        city,
+        quartier,
+        project: project.name || "-",
+        developer,
+        units: parseNumeric(project.total_units),
+        commercializationRate: parsePercent(project.commercialization_rate_global),
+        salesVelocity: parseNumeric(project.sales_velocity_global),
+        typologies: typologyMetricsByLabel,
+        averageTerrain: rowTerrainValues.length ? rowTerrainValues.reduce((sum, value) => sum + value, 0) / rowTerrainValues.length : 0,
+        averageHabitable: rowHabitableValues.length ? rowHabitableValues.reduce((sum, value) => sum + value, 0) / rowHabitableValues.length : 0,
+        averagePrice: rowPriceValues.length ? rowPriceValues.reduce((sum, value) => sum + value, 0) / rowPriceValues.length : 0,
+        averageCus: rowCusValues.length ? rowCusValues.reduce((sum, value) => sum + value, 0) / rowCusValues.length : 0,
+        priceMin: Number.isFinite(projectPriceMin) ? projectPriceMin : 0,
+        priceMax: Number.isFinite(projectPriceMax) ? projectPriceMax : 0,
+      });
+    });
+
+    const residentialTypologyGroupOrder = ["F2/Studio", "F3", "F4", "F5", "F5**", "Villa jumelée", "villa isolée", "Villa en bande", "Non specifie"];
+    const residentialTypologyGroupLabels = Array.from(residentialTypologyGroups).sort((a, b) => {
+      const orderA = residentialTypologyGroupOrder.indexOf(a);
+      const orderB = residentialTypologyGroupOrder.indexOf(b);
+      if (orderA >= 0 && orderB >= 0) return orderA - orderB;
+      if (orderA >= 0) return -1;
+      if (orderB >= 0) return 1;
+      return a.localeCompare(b);
+    });
+
+    const residentialCategoryBars = Object.entries(residentialPriceByCategory)
+      .map(([label, bucket]) => ({ label, value: bucket.count > 0 ? bucket.sum / bucket.count : 0 }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => a.value - b.value);
+
+    const residentialCityPriceBars = Object.entries(residentialPriceByCity)
+      .map(([label, bucket]) => ({ label, value: bucket.count > 0 ? bucket.sum / bucket.count : 0 }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8);
+
+    const residentialDensityBars = Object.entries(residentialDensityByCategory)
+      .map(([label, bucket]) => ({ label, value: bucket.count > 0 ? bucket.sum / bucket.count : 0 }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+
+    const residentialCategorySlices = buildSlicesFromRecord(residentialCategoryCounts);
+    const residentialProjectCount = residentialProjects.length;
+    const residentialTopCity = buildTopBars(residentialCityCounts, 1)[0]?.label || "-";
+    const residentialTopTypology = buildTopBars(residentialTypologyCounts, 1)[0]?.label || "-";
+    const residentialTotalUnits = residentialProjects.reduce((sum, project) => sum + parseNumeric(project.total_units), 0);
+    const residentialCommercializationValues = residentialProjects.map((project) => parsePercent(project.commercialization_rate_global)).filter((value) => value > 0);
+    const residentialSalesVelocityValues = residentialProjects.map((project) => parseNumeric(project.sales_velocity_global)).filter((value) => value > 0);
+    const residentialAveragePrice = residentialCategoryBars.length
+      ? residentialCategoryBars.reduce((sum, item) => sum + item.value, 0) / residentialCategoryBars.length
+      : 0;
+    const residentialAverageDensity = residentialDensityBars.length
+      ? residentialDensityBars.reduce((sum, item) => sum + item.value, 0) / residentialDensityBars.length
+      : 0;
+    const residentialCommercializationAvg = residentialCommercializationValues.length ? residentialCommercializationValues.reduce((sum, value) => sum + value, 0) / residentialCommercializationValues.length : 0;
+    const residentialSalesVelocityAvg = residentialSalesVelocityValues.length ? residentialSalesVelocityValues.reduce((sum, value) => sum + value, 0) / residentialSalesVelocityValues.length : 0;
+    const residentialSegments = ["Collectif", "Villa", "Lot de villas"].map((segment) => {
+      const segmentRows = residentialBenchmarkRows.filter((row) => row.category.includes(segment));
+      const segmentQuartierCounts: Record<string, number> = {};
+      const segmentTypologyCounts: Record<string, number> = {};
+      const prices = segmentRows.map((row) => row.averagePrice).filter((value) => value > 0);
+      const terrains = segmentRows.map((row) => row.averageTerrain).filter((value) => value > 0);
+      const habitableAreas = segmentRows.map((row) => row.averageHabitable).filter((value) => value > 0);
+      const cusValues = segmentRows.map((row) => row.averageCus).filter((value) => value > 0);
+      const unitValues = segmentRows.map((row) => row.units).filter((value) => value > 0);
+      const commercializationValues = segmentRows.map((row) => row.commercializationRate).filter((value) => value > 0);
+      const salesVelocityValues = segmentRows.map((row) => row.salesVelocity).filter((value) => value > 0);
+
+      segmentRows.forEach((row) => {
+        const quartierKey = row.quartier || "Non specifie";
+        segmentQuartierCounts[quartierKey] = (segmentQuartierCounts[quartierKey] || 0) + 1;
+        Object.keys(row.typologies).forEach((typology) => {
+          segmentTypologyCounts[typology] = (segmentTypologyCounts[typology] || 0) + 1;
+        });
+      });
+
+      const quartierPriceBuckets: Record<string, { min: number; moy: number; max: number; count: number }> = {};
+      segmentRows.forEach((row) => {
+        const key = row.quartier || "Non specifie";
+        const bucket = quartierPriceBuckets[key] || { min: Number.POSITIVE_INFINITY, moy: 0, max: 0, count: 0 };
+        bucket.min = Math.min(bucket.min, row.priceMin > 0 ? row.priceMin : row.averagePrice);
+        bucket.moy += row.averagePrice;
+        bucket.max = Math.max(bucket.max, row.priceMax > 0 ? row.priceMax : row.averagePrice);
+        bucket.count += 1;
+        quartierPriceBuckets[key] = bucket;
+      });
+      const cityAverageBars = Object.entries(quartierPriceBuckets)
+        .map(([label, bucket]) => ({ label, value: bucket.count > 0 ? bucket.moy / bucket.count : 0 }))
+        .filter((item) => item.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+      const cityMinMidMaxBars = Object.entries(quartierPriceBuckets)
+        .map(([label, bucket]) => ({
+          label,
+          min: bucket.count > 0 && Number.isFinite(bucket.min) ? bucket.min : 0,
+          moy: bucket.count > 0 ? bucket.moy / bucket.count : 0,
+          max: bucket.count > 0 ? bucket.max : 0,
+        }))
+        .filter((item) => item.moy > 0)
+        .sort((a, b) => b.moy - a.moy)
+        .slice(0, 8);
+
+      const priceValues = prices.length ? prices : [0];
+      const priceMin = Math.min(...priceValues.filter((value) => value > 0));
+      const priceMax = Math.max(...priceValues.filter((value) => value > 0));
+      const lowThreshold = priceMin && priceMax ? priceMin + (priceMax - priceMin) * 0.33 : 0;
+      const highThreshold = priceMin && priceMax ? priceMin + (priceMax - priceMin) * 0.66 : 0;
+      const pricePositionCounts: Record<string, number> = { "Prix accessible": 0, "Prix intermédiaire": 0, "Prix premium": 0 };
+      segmentRows.forEach((row) => {
+        if (row.averagePrice <= 0) return;
+        if (highThreshold > 0 && row.averagePrice >= highThreshold) pricePositionCounts["Prix premium"] += 1;
+        else if (lowThreshold > 0 && row.averagePrice >= lowThreshold) pricePositionCounts["Prix intermédiaire"] += 1;
+        else pricePositionCounts["Prix accessible"] += 1;
+      });
+
+      return {
+        key: segment,
+        label: segment,
+        count: segmentRows.length,
+        averagePrice: prices.length ? prices.reduce((sum, value) => sum + value, 0) / prices.length : 0,
+        averageSurface: habitableAreas.length ? habitableAreas.reduce((sum, value) => sum + value, 0) / habitableAreas.length : 0,
+        averageTerrain: terrains.length ? terrains.reduce((sum, value) => sum + value, 0) / terrains.length : 0,
+        averageCus: cusValues.length ? cusValues.reduce((sum, value) => sum + value, 0) / cusValues.length : 0,
+        averageDensity: residentialDensityByCategory[segment]?.count ? residentialDensityByCategory[segment].sum / residentialDensityByCategory[segment].count : 0,
+        commercializationAvg: commercializationValues.length ? commercializationValues.reduce((sum, value) => sum + value, 0) / commercializationValues.length : 0,
+        salesVelocityAvg: salesVelocityValues.length ? salesVelocityValues.reduce((sum, value) => sum + value, 0) / salesVelocityValues.length : 0,
+        averageUnits: unitValues.length ? unitValues.reduce((sum, value) => sum + value, 0) / unitValues.length : 0,
+        topQuartiers: buildTopBars(segmentQuartierCounts, 3),
+        typologySlices: buildSlicesFromRecord(segmentTypologyCounts),
+        pricePositionSlices: buildSlicesFromRecord(pricePositionCounts),
+        cityAverageBars,
+        cityMinMidMaxBars,
+        rows: segmentRows,
+      };
+    });
+
     const benchmarkRows = hotelBenchmarkRawRows
       .slice()
       .sort((a, b) => b.standardPrice - a.standardPrice)
@@ -1163,8 +1864,26 @@ export default function DashboardScreen() {
         benchmarkRoomTypes,
         benchmarkRows: benchmarkAverageRow ? [...benchmarkRows, benchmarkAverageRow] : benchmarkRows,
       },
+      residential: {
+        projectCount: residentialProjectCount,
+        categorySlices: residentialCategorySlices,
+        typologyCount: Object.keys(residentialTypologyCounts).length,
+        topCity: residentialTopCity,
+        topTypology: residentialTopTypology,
+        totalUnits: residentialTotalUnits,
+        categoryBars: residentialCategoryBars,
+        cityPriceBars: residentialCityPriceBars,
+        densityBars: residentialDensityBars,
+        averagePrice: residentialAveragePrice,
+        averageDensity: residentialAverageDensity,
+        commercializationAvg: residentialCommercializationAvg,
+        salesVelocityAvg: residentialSalesVelocityAvg,
+        segments: residentialSegments,
+        benchmarkRows: residentialBenchmarkRows.sort((a, b) => b.averagePrice - a.averagePrice).slice(0, 18),
+        benchmarkTypologies: residentialTypologyGroupLabels,
+      },
     };
-  }, [projects, retailRows, extendedRows]);
+  }, [projects, retailRows, extendedRows, typologyRows, densityRows]);
 
   const retailUx = useMemo(() => {
     const detailsByProjectId = new Map(extendedRows.map((row) => [row.project_id, row.details || {}]));
@@ -1307,6 +2026,190 @@ export default function DashboardScreen() {
 
   const isWide = width >= 1200;
 
+  const residentialCityOptions = useMemo(() => {
+    const cities = new Set<string>();
+    stats.residential.segments.forEach((segment) => {
+      segment.rows.forEach((row) => {
+        if (row.city) cities.add(row.city);
+      });
+    });
+    return Array.from(cities).sort((a, b) => a.localeCompare(b));
+  }, [stats.residential.segments]);
+
+  const filterRowsByCity = (rows: Array<any>, cityFilter: string) => (cityFilter === "all" ? rows : rows.filter((row) => row.city === cityFilter));
+  const asQuartierLabel = (row: { city: string; quartier: string }, cityFilter: string) => (cityFilter === "all" ? `${row.city} - ${row.quartier || "Non specifie"}` : row.quartier || "Non specifie");
+  const getPricePerSquareMeter = (row: { averagePrice: number; averageHabitable: number; averageTerrain: number; category?: string }) => {
+    const usesTerrain = row.category?.includes("Lot de villas");
+    const baseSurface = usesTerrain ? row.averageTerrain : row.averageHabitable;
+    return row.averagePrice > 0 && baseSurface > 0 ? row.averagePrice / baseSurface : 0;
+  };
+
+  const buildPricePositionSlices = (rows: Array<any>) => {
+    const prices = rows.map((row) => row.averagePrice).filter((value: number) => value > 0);
+    if (prices.length === 0) return [] as SliceItem[];
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const lowThreshold = min + (max - min) * 0.33;
+    const highThreshold = min + (max - min) * 0.66;
+    const counts: Record<string, number> = { "Prix accessible": 0, "Prix intermédiaire": 0, "Prix premium": 0 };
+    rows.forEach((row) => {
+      if (row.averagePrice <= 0) return;
+      if (row.averagePrice >= highThreshold) counts["Prix premium"] += 1;
+      else if (row.averagePrice >= lowThreshold) counts["Prix intermédiaire"] += 1;
+      else counts["Prix accessible"] += 1;
+    });
+    return buildSlicesFromRecord(counts);
+  };
+
+  const buildTypologySlices = (rows: Array<any>) => {
+    const counts: Record<string, number> = {};
+    rows.forEach((row) => {
+      Object.keys(row.typologies || {}).forEach((typology) => {
+        counts[typology] = (counts[typology] || 0) + 1;
+      });
+    });
+    return buildSlicesFromRecord(counts);
+  };
+
+  const buildDominantQuartiers = (rows: Array<any>, cityFilter: string) => {
+    const counts: Record<string, number> = {};
+    rows.forEach((row) => {
+      const key = asQuartierLabel(row, cityFilter);
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return buildTopBars(counts, 3);
+  };
+
+  const buildQuartierAverageBars = (rows: Array<any>, cityFilter: string) => {
+    const buckets: Record<string, { sum: number; count: number }> = {};
+    rows.forEach((row) => {
+      const key = asQuartierLabel(row, cityFilter);
+      const bucket = buckets[key] || { sum: 0, count: 0 };
+      const value = getPricePerSquareMeter(row);
+      if (value <= 0) return;
+      bucket.sum += value;
+      bucket.count += 1;
+      buckets[key] = bucket;
+    });
+    return Object.entries(buckets)
+      .map(([label, bucket]) => ({ label, value: bucket.count > 0 ? bucket.sum / bucket.count : 0 }))
+      .filter((item) => item.value > 0)
+      .sort((a, b) => b.value - a.value);
+  };
+
+  const buildQuartierMinMoyMaxBars = (rows: Array<any>, cityFilter: string) => {
+    const buckets: Record<string, { min: number; moy: number; max: number; count: number }> = {};
+    rows.forEach((row) => {
+      const key = asQuartierLabel(row, cityFilter);
+      const bucket = buckets[key] || { min: Number.POSITIVE_INFINITY, moy: 0, max: 0, count: 0 };
+      const avgSource = getPricePerSquareMeter(row);
+      const baseSurface = row.category?.includes("Lot de villas") ? row.averageTerrain : row.averageHabitable;
+      const minSource = row.priceMin > 0 && baseSurface > 0 ? row.priceMin / baseSurface : avgSource;
+      const maxSource = row.priceMax > 0 && baseSurface > 0 ? row.priceMax / baseSurface : avgSource;
+      if (avgSource <= 0) return;
+      bucket.min = Math.min(bucket.min, minSource);
+      bucket.moy += avgSource;
+      bucket.max = Math.max(bucket.max, maxSource);
+      bucket.count += 1;
+      buckets[key] = bucket;
+    });
+    return Object.entries(buckets)
+      .map(([label, bucket]) => ({
+        label,
+        min: bucket.count > 0 && Number.isFinite(bucket.min) ? bucket.min : 0,
+        moy: bucket.count > 0 ? bucket.moy / bucket.count : 0,
+        max: bucket.count > 0 ? bucket.max : 0,
+      }))
+      .filter((item) => item.moy > 0)
+      .sort((a, b) => b.moy - a.moy);
+  };
+
+  const residentialSegmentsView = stats.residential.segments.map((segment) => {
+    const filteredRows = filterRowsByCity(segment.rows, residentialSegmentCityFilter);
+    const priceValues = filteredRows.map((row) => row.averagePrice).filter((value: number) => value > 0);
+    const terrainValues = filteredRows.map((row) => row.averageTerrain).filter((value: number) => value > 0);
+    const surfaceValues = filteredRows.map((row) => row.averageHabitable).filter((value: number) => value > 0);
+    const cusValues = filteredRows.map((row) => row.averageCus).filter((value: number) => value > 0);
+    const commercializationValues = filteredRows.map((row) => row.commercializationRate).filter((value: number) => value > 0);
+    const salesVelocityValues = filteredRows.map((row) => row.salesVelocity).filter((value: number) => value > 0);
+    const unitValues = filteredRows.map((row) => row.units).filter((value: number) => value > 0);
+    return {
+      ...segment,
+      rows: filteredRows,
+      count: filteredRows.length,
+      averagePrice: priceValues.length ? priceValues.reduce((sum, value) => sum + value, 0) / priceValues.length : 0,
+      averageTerrain: terrainValues.length ? terrainValues.reduce((sum, value) => sum + value, 0) / terrainValues.length : 0,
+      averageSurface: surfaceValues.length ? surfaceValues.reduce((sum, value) => sum + value, 0) / surfaceValues.length : 0,
+      averageCus: cusValues.length ? cusValues.reduce((sum, value) => sum + value, 0) / cusValues.length : 0,
+      commercializationAvg: commercializationValues.length ? commercializationValues.reduce((sum, value) => sum + value, 0) / commercializationValues.length : 0,
+      salesVelocityAvg: salesVelocityValues.length ? salesVelocityValues.reduce((sum, value) => sum + value, 0) / salesVelocityValues.length : 0,
+      averageUnits: unitValues.length ? unitValues.reduce((sum, value) => sum + value, 0) / unitValues.length : 0,
+      typologySlices: buildTypologySlices(filteredRows),
+      pricePositionSlices: buildPricePositionSlices(filteredRows),
+      topQuartiers: buildDominantQuartiers(filteredRows, residentialSegmentCityFilter),
+    };
+  });
+
+  const segmentCollectif = stats.residential.segments.find((segment) => segment.key === "Collectif");
+  const segmentVilla = stats.residential.segments.find((segment) => segment.key === "Villa");
+  const segmentLot = stats.residential.segments.find((segment) => segment.key === "Lot de villas");
+
+  const comparativeCollectifBars = buildQuartierAverageBars(filterRowsByCity(segmentCollectif?.rows || [], residentialComparativeCityFilter), residentialComparativeCityFilter);
+  const comparativeVillaBars = buildQuartierAverageBars(filterRowsByCity(segmentVilla?.rows || [], residentialComparativeCityFilter), residentialComparativeCityFilter);
+  const comparativeLotMinMoyMax = buildQuartierMinMoyMaxBars(filterRowsByCity(segmentLot?.rows || [], residentialComparativeCityFilter), residentialComparativeCityFilter);
+
+  const collectifTypologyRows = ["F2/Studio", "F3", "F4", "F5", "F5**"].map((label) => {
+    const metrics = (segmentCollectif?.rows || []).map((row) => row.typologies[label]).filter((item) => !!item);
+    const habitable = metrics.map((item) => item.habitable).filter((value) => value > 0);
+    const prices = metrics.map((item) => item.price).filter((value) => value > 0);
+    const averageSurface = habitable.length ? habitable.reduce((sum, value) => sum + value, 0) / habitable.length : 0;
+    const averagePrice = prices.length ? prices.reduce((sum, value) => sum + value, 0) / prices.length : 0;
+    return {
+      label,
+      surface: averageSurface,
+      budget: averagePrice,
+      pricePerM2: averageSurface > 0 ? averagePrice / averageSurface : 0,
+    };
+  }).filter((item) => item.surface > 0 || item.budget > 0);
+
+  const residentialPriceOverviewRows = [
+    {
+      label: "Appartement",
+      icon: "▦",
+      surface: segmentCollectif?.averageSurface || 0,
+      budget: segmentCollectif?.averagePrice || 0,
+      pricePerM2: (segmentCollectif?.averageSurface || 0) > 0 ? (segmentCollectif?.averagePrice || 0) / (segmentCollectif?.averageSurface || 1) : 0,
+      flow: segmentCollectif?.salesVelocityAvg ? `${formatDecimal(segmentCollectif.salesVelocityAvg, 1)} unités/mois` : "-",
+    },
+    ...collectifTypologyRows.map((row) => ({
+      label: row.label,
+      surface: row.surface,
+      budget: row.budget,
+      pricePerM2: row.pricePerM2,
+      flow: "-",
+    })),
+    {
+      label: "Villa",
+      icon: "⌂",
+      surface: segmentVilla?.averageSurface || 0,
+      budget: segmentVilla?.averagePrice || 0,
+      pricePerM2: (segmentVilla?.averageSurface || 0) > 0 ? (segmentVilla?.averagePrice || 0) / (segmentVilla?.averageSurface || 1) : 0,
+      flow: segmentVilla?.salesVelocityAvg ? `${formatDecimal(segmentVilla.salesVelocityAvg, 1)} unités/mois` : "-",
+    },
+    {
+      label: "Lots de terrains",
+      icon: "▤",
+      surface: segmentLot?.averageTerrain || 0,
+      budget: segmentLot?.averagePrice || 0,
+      pricePerM2: (segmentLot?.averageTerrain || 0) > 0 ? (segmentLot?.averagePrice || 0) / (segmentLot?.averageTerrain || 1) : 0,
+      flow: segmentLot?.salesVelocityAvg ? `${formatDecimal(segmentLot.salesVelocityAvg, 1)} unités/mois` : "-",
+    },
+  ];
+
+  const tableFilteredCollectif = filterRowsByCity(segmentCollectif?.rows || [], residentialTableCityFilter);
+  const tableFilteredVilla = filterRowsByCity(segmentVilla?.rows || [], residentialTableCityFilter);
+  const tableFilteredLot = filterRowsByCity(segmentLot?.rows || [], residentialTableCityFilter);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TopToolbar />
@@ -1315,6 +2218,7 @@ export default function DashboardScreen() {
 
       <View style={styles.segmentRow}>
         <TouchablePill label="Retail" active={activeDashboard === "retail"} onPress={() => setActiveDashboard("retail")} />
+        <TouchablePill label="Résidentiel" active={activeDashboard === "residential"} onPress={() => setActiveDashboard("residential")} />
         <TouchablePill label="Bureau" active={activeDashboard === "bureau"} onPress={() => setActiveDashboard("bureau")} />
         <TouchablePill label="Sante" active={activeDashboard === "sante"} onPress={() => setActiveDashboard("sante")} />
         <TouchablePill label="Hotel" active={activeDashboard === "hotel"} onPress={() => setActiveDashboard("hotel")} />
@@ -1325,13 +2229,12 @@ export default function DashboardScreen() {
 
       {!loading && !error && activeDashboard === "retail" ? (
         <>
-          <ImageBackground source={DASHBOARD_HERO_IMAGE} style={styles.dashboardHero} imageStyle={styles.dashboardHeroImage}>
+          <ImageBackground source={RETAIL_DASHBOARD_HEADER_IMAGE} style={styles.dashboardHero} imageStyle={[styles.dashboardHeroImage, styles.retailHeroImage]}>
             <View style={styles.dashboardHeroOverlay}>
               <View style={styles.dashboardHeroContent}>
                 <Text style={styles.dashboardHeroTitle}>Dashboard Retail</Text>
                 <Text style={styles.dashboardHeroSubtitle}>Vue executive: offre existante, pipeline, repartition territoriale et standing</Text>
               </View>
-              <Image source={DASHBOARD_MAP_IMAGE} style={styles.dashboardHeroMap} />
             </View>
           </ImageBackground>
 
@@ -1351,12 +2254,12 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.metricsRow}>
-            <MetricCard label="Actifs analyses" value={formatNumber(retailUx.filteredCount)} sublabel="100% du perimetre" />
-            <MetricCard label="GLA existante" value={formatSquareMeters(retailUx.existingGla)} sublabel={`${retailUx.currentYear} YTD: ${formatSquareMeters(retailUx.currentYearGla)}`} />
-            <MetricCard label="GLA pipeline" value={formatSquareMeters(retailUx.pipelineGla)} sublabel={`+${formatCompactPercent(retailUx.growthPct)} potentiel`} accent="pink" />
-            <MetricCard label="Croissance potentielle" value={formatPercent(retailUx.growthPct)} sublabel={`vs ${retailUx.currentYear}`} accent="green" />
-            <MetricCard label="Taux d'occupation moyen" value={formatPercent(retailUx.occupancyAvg)} sublabel="Existant" accent="purple" />
-            <MetricCard label="Enseignes totales" value={formatNumber(stats.retail.enseignesTotal)} sublabel="Actives" />
+            <MetricCard label="Actifs analyses" value={formatNumber(retailUx.filteredCount)} sublabel="100% du perimetre" iconSource={RETAIL_ICON_ACTIFS_ANALYSES_IMAGE} />
+            <MetricCard label="GLA existante" value={formatSquareMeters(retailUx.existingGla)} sublabel={`${retailUx.currentYear} YTD: ${formatSquareMeters(retailUx.currentYearGla)}`} iconSource={RETAIL_ICON_GLA_EXISTANTE_IMAGE} />
+            <MetricCard label="GLA pipeline" value={formatSquareMeters(retailUx.pipelineGla)} sublabel={`+${formatCompactPercent(retailUx.growthPct)} potentiel`} accent="pink" iconSource={RETAIL_ICON_GLA_PIPELINE_IMAGE} />
+            <MetricCard label="Croissance potentielle" value={formatPercent(retailUx.growthPct)} sublabel={`vs ${retailUx.currentYear}`} accent="green" iconSource={RETAIL_ICON_CROISSANCE_POTENTIELLE_IMAGE} />
+            <MetricCard label="Taux d'occupation moyen" value={formatPercent(retailUx.occupancyAvg)} sublabel="Existant" accent="purple" iconSource={RETAIL_ICON_TAUX_OCCUPATION_IMAGE} />
+            <MetricCard label="Enseignes totales" value={formatNumber(stats.retail.enseignesTotal)} sublabel="Actives" iconSource={RETAIL_ICON_ENSEIGNES_TOTALES_IMAGE} />
           </View>
 
           <View style={styles.snapshotPanel}>
@@ -1421,6 +2324,200 @@ export default function DashboardScreen() {
 
           <View style={styles.insightBanner}>
             <InsightBoard title="Insights cles" items={retailUx.insights} />
+            {isWide ? <Image source={DASHBOARD_MAP_IMAGE} style={styles.insightArt} /> : null}
+          </View>
+        </>
+      ) : null}
+
+      {!loading && !error && activeDashboard === "residential" ? (
+        <>
+          <ImageBackground source={RESIDENTIAL_DASHBOARD_HEADER_IMAGE} style={styles.dashboardHero} imageStyle={[styles.dashboardHeroImage, styles.retailHeroImage]}>
+            <View style={styles.dashboardHeroOverlay}>
+              <View style={styles.dashboardHeroContent}>
+                <Text style={styles.dashboardHeroTitle}>Dashboard Résidentiel</Text>
+                <Text style={styles.dashboardHeroSubtitle}>Vue executive: collectif, villa et lot de villas avec benchmark prix, densite et typologies</Text>
+              </View>
+            </View>
+          </ImageBackground>
+
+          <View style={styles.retailTopBar}>
+            <View style={styles.retailTitleWrap}>
+              <View style={styles.retailTitleIcon}><Text style={styles.retailTitleIconText}>[]</Text></View>
+              <View>
+                <Text style={styles.sectionTitle}>Dashboard Résidentiel</Text>
+                <Text style={styles.sectionSubtitle}>Collectif, Villa et Lot de villas avec lecture portfolio, prix et densité</Text>
+              </View>
+            </View>
+            <View style={styles.retailTopActions}>
+              <ToolbarButton label="Benchmark" />
+              <ToolbarButton label="Exporter" />
+              <ToolbarButton label="Filtres avances" />
+            </View>
+          </View>
+
+          <View style={styles.residentialOverviewSection}>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>Vue d'ensemble du marché résidentiel</Text>
+                <Text style={styles.sectionSubtitle}>Lecture portefeuille par segment et comparaison des prix</Text>
+              </View>
+              <TouchableOpacity activeOpacity={0.88} style={styles.residentialActionPill}>
+                <Text style={styles.residentialActionPillText}>Voir le détail par segment</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.metricsRow}>
+              <MetricCard label="Projets collectifs" value={formatNumber(stats.residential.segments.find((segment) => segment.key === "Collectif")?.count || 0)} sublabel="Portefeuille collectif" accent="pink" iconSource={DASHBOARD_LOGO_COLLECTIF_IMAGE} />
+              <MetricCard label="Projets villas" value={formatNumber(stats.residential.segments.find((segment) => segment.key === "Villa")?.count || 0)} sublabel="Portefeuille villas" accent="green" iconSource={DASHBOARD_LOGO_VILLA_IMAGE} />
+              <MetricCard label="Projets lots de villas" value={formatNumber(stats.residential.segments.find((segment) => segment.key === "Lot de villas")?.count || 0)} sublabel="Portefeuille lots de villas" accent="purple" iconSource={DASHBOARD_LOGO_LOT_IMAGE} />
+            </View>
+
+            <ResidentialPriceOverviewMatrix rows={residentialPriceOverviewRows} />
+
+            <View style={styles.filterBlockPremium}>
+              <View style={styles.filterHeaderRow}>
+                <Text style={styles.filterTitle}>Filtre des analyses comparatives par ville</Text>
+                <TouchableOpacity activeOpacity={0.88} style={styles.resetButton} onPress={() => setResidentialComparativeCityFilter("all")}>
+                  <Text style={styles.resetButtonText}>Tout afficher</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Ville</Text>
+                <TouchablePill label="Tous" active={residentialComparativeCityFilter === "all"} onPress={() => setResidentialComparativeCityFilter("all")} />
+                {residentialCityOptions.map((city) => (
+                  <TouchablePill key={`compare-${city}`} label={city} active={residentialComparativeCityFilter === city} onPress={() => setResidentialComparativeCityFilter(city)} />
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.chartGrid}>
+              <HistogramMinMoyMax title="Analyse comparative des prix de vente au m² Min / Moy./ Max de Lots de villas (MAD/m²)" bars={comparativeLotMinMoyMax} />
+              <HistogramSingleSeries title="Analyse comparative des prix de vente au m² moyens (MAD/m²) - Collectif" bars={comparativeCollectifBars} formatter={(value) => `${formatNumber(value)} MAD/m²`} />
+              <HistogramSingleSeries title="Analyse comparative des prix de vente au m² moyens (MAD/m²) - Villas" bars={comparativeVillaBars} formatter={(value) => `${formatNumber(value)} MAD/m²`} />
+            </View>
+          </View>
+
+          <View style={styles.residentialSegmentsSection}>
+            <View style={styles.sectionHeaderRow}>
+              <View>
+                <Text style={styles.sectionTitle}>Performance par segment</Text>
+                <Text style={styles.sectionSubtitle}>Analyse détaillée du collectif, des villas et des lots de villa</Text>
+              </View>
+              <TouchableOpacity activeOpacity={0.88} style={styles.residentialActionPill}>
+                <Text style={styles.residentialActionPillText}>Voir le détail par segment</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Ville</Text>
+              <TouchablePill label="Tous" active={residentialSegmentCityFilter === "all"} onPress={() => setResidentialSegmentCityFilter("all")} />
+              {residentialCityOptions.map((city) => (
+                <TouchablePill key={`segment-${city}`} label={city} active={residentialSegmentCityFilter === city} onPress={() => setResidentialSegmentCityFilter(city)} />
+              ))}
+            </View>
+
+            <View style={styles.residentialSegmentGrid}>
+              {residentialSegmentsView.map((segment, segmentIdx) => (
+                <View key={segment.key} style={styles.residentialSegmentCard}>
+                  <View style={styles.residentialSegmentHeader}>
+                    <View style={styles.residentialSegmentImageWrap}>
+                      <Image
+                        source={segment.key === "Collectif" ? DASHBOARD_SEGMENT_COLLECTIF_IMAGE : segment.key === "Villa" ? DASHBOARD_SEGMENT_VILLA_IMAGE : DASHBOARD_SEGMENT_LOT_IMAGE}
+                        style={styles.residentialSegmentImage}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <View style={styles.residentialSegmentTitleWrap}>
+                      <Text style={styles.residentialSegmentTitle}>{segment.label}</Text>
+                      <Text style={styles.residentialSegmentSubtitle}>{segmentIdx === 0 ? "Appartements du studio au F5" : segmentIdx === 1 ? "En bande, jumelées et isolées" : "Terrains pour villas"}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.residentialSegmentKpiRow}>
+                    {segment.key === "Collectif" ? (
+                      <>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Surface habitable moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageSurface > 0 ? `${formatNumber(Math.round(segment.averageSurface))} m²` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Prix de vente moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averagePrice > 0 ? `${formatNumber(Math.round(segment.averagePrice))} MAD` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Taux d'ecoulement moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.commercializationAvg > 0 ? `${formatPercent(segment.commercializationAvg)}` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Nombre d'unites moyen</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageUnits > 0 ? formatNumber(Math.round(segment.averageUnits)) : "-"}</Text></View>
+                      </>
+                    ) : segment.key === "Villa" ? (
+                      <>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Surface terrain moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageTerrain > 0 ? `${formatNumber(Math.round(segment.averageTerrain))} m²` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Surface habitable moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageSurface > 0 ? `${formatNumber(Math.round(segment.averageSurface))} m²` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Prix de vente moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averagePrice > 0 ? `${formatNumber(Math.round(segment.averagePrice))} MAD` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Taux d'ecoulement moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.commercializationAvg > 0 ? `${formatPercent(segment.commercializationAvg)}` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Nombre d'unites moyen</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageUnits > 0 ? formatNumber(Math.round(segment.averageUnits)) : "-"}</Text></View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Surface terrain moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageTerrain > 0 ? `${formatNumber(Math.round(segment.averageTerrain))} m²` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>CUS moyen</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageCus > 0 ? formatDecimal(segment.averageCus, 2) : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Prix de vente moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averagePrice > 0 ? `${formatNumber(Math.round(segment.averagePrice))} MAD` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Taux d'ecoulement moy.</Text><Text style={styles.residentialSegmentKpiValue}>{segment.commercializationAvg > 0 ? `${formatPercent(segment.commercializationAvg)}` : "-"}</Text></View>
+                        <View style={styles.residentialSegmentKpi}><Text style={styles.residentialSegmentKpiLabel}>Densité moyenne</Text><Text style={styles.residentialSegmentKpiValue}>{segment.averageDensity > 0 ? formatNumber(Math.round(segment.averageDensity)) : "-"}</Text></View>
+                      </>
+                    )}
+                  </View>
+
+                  <View style={styles.residentialSegmentChartRow}>
+                    <PieChart title="Répartition par typologie" slices={segment.typologySlices} totalLabel="projets" containerStyle={styles.residentialSegmentChart} />
+                    <PieChart title="Répartition par positionnement prix" slices={segment.pricePositionSlices} totalLabel="projets" containerStyle={styles.residentialSegmentChart} />
+                  </View>
+
+                  <View style={styles.residentialSegmentRanks}>
+                    <Text style={styles.residentialSegmentRanksTitle}>Quartiers dominants</Text>
+                    <View style={styles.residentialSegmentRankRow}>
+                      {segment.topQuartiers.map((quartier, index) => (
+                        <View key={`${segment.key}-${quartier.label}`} style={styles.residentialSegmentRankItem}>
+                          <View style={styles.residentialSegmentRankPill}><Text style={styles.residentialSegmentRankNumber}>{index + 1}</Text></View>
+                          <Text style={styles.residentialSegmentRankLabel} numberOfLines={1}>{quartier.label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.residentialTablesSection}>
+            <View style={styles.filterBlockPremium}>
+              <View style={styles.filterHeaderRow}>
+                <Text style={styles.filterTitle}>Filtre des tableaux par ville</Text>
+                <TouchableOpacity activeOpacity={0.88} style={styles.resetButton} onPress={() => setResidentialTableCityFilter("all")}>
+                  <Text style={styles.resetButtonText}>Tout afficher</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.filterRow}>
+                <Text style={styles.filterLabel}>Ville</Text>
+                <TouchablePill label="Tous" active={residentialTableCityFilter === "all"} onPress={() => setResidentialTableCityFilter("all")} />
+                {residentialCityOptions.map((city) => (
+                  <TouchablePill key={`table-${city}`} label={city} active={residentialTableCityFilter === city} onPress={() => setResidentialTableCityFilter(city)} />
+                ))}
+              </View>
+            </View>
+
+            <TableCard title="Collectif" ctaLabel="Voir tout">
+              <ResidentialSegmentTable title="" segment="collectif" rows={tableFilteredCollectif} />
+            </TableCard>
+            <TableCard title="Villas" ctaLabel="Voir tout">
+              <ResidentialSegmentTable title="" segment="villa" rows={tableFilteredVilla} />
+            </TableCard>
+            <TableCard title="Lots de villas" ctaLabel="Voir tout">
+              <ResidentialSegmentTable title="" segment="lot" rows={tableFilteredLot} />
+            </TableCard>
+          </View>
+
+          <View style={styles.insightBanner}>
+            <InsightBoard
+              title="Insights cles"
+              items={[
+                stats.residential.topCity ? `${stats.residential.topCity} ressort comme zone la plus dense du portefeuille résidentiel.` : "La ville leader apparaîtra dès que les projets sont renseignés.",
+                stats.residential.topTypology ? `${stats.residential.topTypology} domine le mix typologique observé.` : "Les typologies principales s'affichent dès qu'elles sont ajoutées.",
+                `Le portefeuille résidentiel affiche ${formatNumber(stats.residential.projectCount)} actifs et ${formatNumber(stats.residential.typologyCount)} typologies suivies.`,
+              ]}
+            />
             {isWide ? <Image source={DASHBOARD_MAP_IMAGE} style={styles.insightArt} /> : null}
           </View>
         </>
@@ -1622,13 +2719,12 @@ export default function DashboardScreen() {
 
       {!loading && !error && activeDashboard === "hotel" ? (
         <>
-          <ImageBackground source={DASHBOARD_HERO_IMAGE} style={styles.dashboardHero} imageStyle={styles.dashboardHeroImage}>
-            <View style={styles.dashboardHeroOverlay}>
-              <View style={styles.dashboardHeroContent}>
+          <ImageBackground source={HOTEL_DASHBOARD_HEADER_IMAGE} style={styles.dashboardHero} imageStyle={[styles.dashboardHeroImage, styles.hotelHeroImage]}>
+            <View style={styles.hotelHeroOverlay}>
+              <View style={styles.hotelHeroContent}>
                 <Text style={styles.dashboardHeroTitle}>Dashboard Hotel</Text>
                 <Text style={styles.dashboardHeroSubtitle}>Vue executive: capacite d'accueil, categories et mix de services</Text>
               </View>
-              <Image source={DASHBOARD_MAP_IMAGE} style={styles.dashboardHeroMap} />
             </View>
           </ImageBackground>
 
@@ -1648,12 +2744,12 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.metricsRow}>
-            <MetricCard label="Actifs hotel" value={formatNumber(stats.hotel.projectCount)} sublabel="Portefeuille analyse" />
-            <MetricCard label="Nombre de cles" value={formatNumber(stats.hotel.totalKeys)} sublabel="Capacite totale" />
-            <MetricCard label="Nombre de chambres" value={formatNumber(stats.hotel.totalRooms)} sublabel="Inventaire total" accent="pink" />
-            <MetricCard label="Categories" value={formatNumber(stats.hotel.categorySlices.length)} sublabel="Segments observes" accent="green" />
-            <MetricCard label="Cles / actif" value={stats.hotel.projectCount > 0 ? formatNumber(Math.round(stats.hotel.totalKeys / stats.hotel.projectCount)) : "0"} sublabel="Moyenne" accent="purple" />
-            <MetricCard label="Mix services" value={stats.hotel.mixKpi} sublabel="F&B / MICE / Loisirs" />
+            <MetricCard label="Actifs hotel" value={formatNumber(stats.hotel.projectCount)} sublabel="Portefeuille analyse" iconSource={HOTEL_ICON_ACTIFS_HOTEL_IMAGE} />
+            <MetricCard label="Nombre de cles" value={formatNumber(stats.hotel.totalKeys)} sublabel="Capacite totale" iconSource={HOTEL_ICON_NOMBRE_CLES_IMAGE} />
+            <MetricCard label="Nombre de chambres" value={formatNumber(stats.hotel.totalRooms)} sublabel="Inventaire total" accent="pink" iconSource={HOTEL_ICON_NOMBRE_CHAMBRES_IMAGE} />
+            <MetricCard label="Categories" value={formatNumber(stats.hotel.categorySlices.length)} sublabel="Segments observes" accent="green" iconSource={HOTEL_ICON_CATEGORIES_IMAGE} />
+            <MetricCard label="Cles / actif" value={stats.hotel.projectCount > 0 ? formatNumber(Math.round(stats.hotel.totalKeys / stats.hotel.projectCount)) : "0"} sublabel="Moyenne" accent="purple" iconSource={HOTEL_ICON_CLES_ACTIF_IMAGE} />
+            <MetricCard label="Mix services" value={stats.hotel.mixKpi} sublabel="F&B / MICE / Loisirs" iconSource={HOTEL_ICON_MIX_SERVICES_IMAGE} />
           </View>
 
           <View style={styles.snapshotPanel}>
@@ -1678,7 +2774,7 @@ export default function DashboardScreen() {
               <HorizontalBars title="Cles par ville" bars={stats.hotel.keysByCityBars} containerStyle={styles.hotelCardThird} />
             </View>
             <View style={styles.hotelChartRow}>
-              <CompareBars title="Comparatif capacite" leftLabel="Cles" leftValue={stats.hotel.totalKeys} rightLabel="Chambres" rightValue={stats.hotel.totalRooms} containerStyle={styles.hotelCardHalf} />
+              <CompareBars title="Comparatif capacité" leftLabel="Cles" leftValue={stats.hotel.totalKeys} rightLabel="Chambres" rightValue={stats.hotel.totalRooms} containerStyle={styles.hotelCardHalf} />
               <HorizontalBars
                 title="Mix services par actif"
                 bars={stats.hotel.equipmentRows.map((row) => ({ label: row[0], value: parseNumeric(row[2]) + parseNumeric(row[3]) + parseNumeric(row[4]) })).sort((a, b) => b.value - a.value).slice(0, 8)}
@@ -1742,10 +2838,18 @@ const styles = StyleSheet.create({
   userRole: { color: "#8FA0AE", fontSize: 11, fontFamily: "Century Gothic" },
   pageTitle: { fontSize: 34, fontWeight: "700", color: AppColors.primary.main, fontFamily: "Century Gothic" },
   pageSubtitle: { marginTop: 4, marginBottom: 8, fontSize: 16, color: AppColors.gray.dark, fontFamily: "Century Gothic", lineHeight: 22 },
-  dashboardHero: { minHeight: 146, borderRadius: 24, overflow: "hidden", borderWidth: 1, borderColor: "#E0EAF4" },
-  dashboardHeroImage: { resizeMode: "cover" },
-  dashboardHeroOverlay: { flex: 1, flexDirection: "row", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.80)" },
-  dashboardHeroContent: { flex: 1, paddingHorizontal: 22, paddingVertical: 18, justifyContent: "center" },
+  dashboardHero: { width: "100%", minHeight: 146, borderRadius: 24, overflow: "hidden", borderWidth: 1, borderColor: "#E0EAF4", alignSelf: "stretch" },
+  dashboardHeroImage: { resizeMode: "cover", width: "100%", height: "100%" },
+  retailHeroImage: { resizeMode: "cover", width: "100%", height: "100%" },
+  hotelHeroImage: { resizeMode: "cover", width: "100%", height: "100%" },
+  dashboardHeroOverlay: { flex: 1, flexDirection: "row", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.08)" },
+  hotelHeroOverlay: { flex: 1, flexDirection: "row", justifyContent: "space-between", backgroundColor: "rgba(255,255,255,0.02)" },
+  dashboardHeroContent: { flex: 1, paddingHorizontal: 22, paddingVertical: 18, justifyContent: "center", maxWidth: "72%" },
+  hotelHeroContent: { flex: 1, paddingHorizontal: 22, paddingVertical: 18, justifyContent: "center", maxWidth: "60%" },
+  residentialHeroFullBleed: { marginHorizontal: -16, borderRadius: 0, borderLeftWidth: 0, borderRightWidth: 0 },
+  residentialHeroImage: { resizeMode: "cover" },
+  residentialHeroOverlay: { flex: 1, backgroundColor: "rgba(255,255,255,0.22)" },
+  residentialHeroContent: { maxWidth: "100%" },
   dashboardHeroTitle: { color: AppColors.primary.main, fontSize: 34, fontWeight: "700", fontFamily: "Century Gothic" },
   dashboardHeroSubtitle: { marginTop: 6, color: "#5B7590", fontSize: 15, lineHeight: 22, fontFamily: "Century Gothic" },
   dashboardHeroMap: { width: 260, height: "100%", opacity: 0.95 },
@@ -1767,7 +2871,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 28, fontWeight: "700", color: "#1C5377", fontFamily: "Century Gothic" },
   sectionSubtitle: { fontSize: 14, color: "#657E95", fontFamily: "Century Gothic", lineHeight: 22 },
   metricsRow: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  metricCard: { width: "32%", minWidth: 210, flexGrow: 1, borderRadius: 18, borderWidth: 1, borderColor: "#E2ECF5", backgroundColor: AppColors.ui.background, padding: 16, shadowColor: "#123456", shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  metricCard: { width: "32%", minWidth: 210, flexGrow: 1, borderRadius: 18, borderWidth: 1, borderColor: "#DDECF4", backgroundColor: "#FFFFFF", padding: 16, shadowColor: "#123456", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
   metricLabel: { color: "#617A91", fontSize: 13, marginBottom: 12, fontFamily: "Century Gothic" },
   metricValueRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
   metricTextCol: { flex: 1 },
@@ -1776,10 +2880,11 @@ const styles = StyleSheet.create({
   metricValueGreen: { color: "#2EAC69" },
   metricValuePurple: { color: "#6C5AD8" },
   metricSubLabel: { marginTop: 8, color: "#90A1AF", fontSize: 12, fontFamily: "Century Gothic" },
-  metricIconBubble: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#E8F4FA", alignItems: "center", justifyContent: "center" },
-  metricIconPink: { backgroundColor: "#FFE8F2" },
-  metricIconGreen: { backgroundColor: "#E8F8EE" },
-  metricIconPurple: { backgroundColor: "#F0EBFF" },
+  metricIconBubble: { width: 72, height: 72, borderRadius: 36, backgroundColor: "#E7F6FB", alignItems: "center", justifyContent: "center", overflow: "hidden", borderWidth: 1, borderColor: "#D9EEF5" },
+  metricIconPink: { backgroundColor: "#E7F6FB" },
+  metricIconGreen: { backgroundColor: "#E7F6FB" },
+  metricIconPurple: { backgroundColor: "#E7F6FB" },
+  metricIconImage: { width: "70%", height: "70%" },
   metricIconText: { color: AppColors.primary.main, fontWeight: "700", fontFamily: "Century Gothic" },
   snapshotPanel: { borderRadius: 18, borderWidth: 1, borderColor: "#D9EAF3", backgroundColor: "#F5FBFF", padding: 18, flexDirection: "row", gap: 18, overflow: "hidden" },
   snapshotContent: { flex: 1 },
@@ -1809,7 +2914,7 @@ const styles = StyleSheet.create({
   chartTitle: { fontSize: 18, fontWeight: "700", color: "#1C5377", fontFamily: "Century Gothic", marginBottom: 12 },
   chartSubtle: { marginTop: -6, marginBottom: 12, fontSize: 12, color: "#6A8298", fontFamily: "Century Gothic" },
   emptyText: { fontSize: 15, color: AppColors.gray.dark, fontFamily: "Century Gothic" },
-  legendWrap: { width: "100%", marginTop: 6, gap: 6 },
+  legendWrap: { width: "100%", marginTop: 6, gap: 6, minHeight: 66 },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { flex: 1, fontSize: 13, color: AppColors.ui.text, fontFamily: "Century Gothic" },
@@ -1853,6 +2958,63 @@ const styles = StyleSheet.create({
   priceComparisonChip: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: 1, borderColor: "#D9EAF3", backgroundColor: "#F8FBFE", paddingHorizontal: 10, paddingVertical: 6 },
   priceComparisonLabel: { color: "#355D79", fontSize: 12, fontFamily: "Century Gothic" },
   priceComparisonArrow: { color: "#6B8AA1", fontSize: 12, fontWeight: "700", fontFamily: "Century Gothic" },
+  minMidMaxLegendRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
+  minMidMaxLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  minMidMaxRow: { marginBottom: 12, gap: 6 },
+  minMidMaxLabel: { fontSize: 13, color: AppColors.ui.text, fontFamily: "Century Gothic", fontWeight: "700" },
+  minMidMaxBarsWrap: { gap: 6 },
+  minMidMaxBarLine: { flexDirection: "row", alignItems: "center", gap: 8 },
+  minMidMaxBarFill: { height: 10, borderRadius: 99, minWidth: 4 },
+  minMidMaxBarValue: { width: 90, fontSize: 12, color: AppColors.gray.dark, fontFamily: "Century Gothic", textAlign: "right" },
+  histogramScrollContent: { flexGrow: 1 },
+  histogramWrap: { flexDirection: "row", alignItems: "flex-end", gap: 14, minHeight: 220, paddingBottom: 8 },
+  histogramWrapSpread: { justifyContent: "space-evenly" },
+  histCol: { alignItems: "center", gap: 8 },
+  histGroupCol: { alignItems: "center", gap: 8 },
+  histValue: { color: "#2D5A78", fontSize: 11, fontWeight: "700", fontFamily: "Century Gothic", textAlign: "center", minHeight: 26, lineHeight: 12, minWidth: 24 },
+  histTrack: { width: "100%", height: 146, borderBottomWidth: 1, borderBottomColor: "#D8E4EE", justifyContent: "flex-end", alignItems: "center" },
+  histFill: { width: "100%", borderTopLeftRadius: 5, borderTopRightRadius: 5, backgroundColor: "#2B8BA8" },
+  histLabel: { color: "#5B7590", fontSize: 11, lineHeight: 13, fontFamily: "Century Gothic", textAlign: "center", marginTop: 2, minHeight: 52, width: 84 },
+  histGroupBarsRow: { width: "100%", flexDirection: "row", justifyContent: "center", alignItems: "flex-end", gap: 5 },
+  histGroupedFill: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  histGroupValuesRow: { flexDirection: "row", justifyContent: "center", gap: 6, minHeight: 34, alignItems: "flex-end" },
+  histGroupValue: { width: 28, color: "#2D5A78", fontSize: 10, lineHeight: 11, fontFamily: "Century Gothic", textAlign: "center", fontWeight: "700" },
+  residentialPriceMatrixCard: {
+    borderRadius: 22,
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "rgba(104, 167, 190, 0.26)",
+    shadowColor: "#8AC5D9",
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  residentialPriceMatrixHeaderRow: { flexDirection: "row", backgroundColor: "#2B8BA8", minHeight: 62 },
+  residentialPriceMatrixHeadCellFirst: { width: "20%", borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.38)", paddingHorizontal: 10, paddingVertical: 12, justifyContent: "center" },
+  residentialPriceMatrixHeadCell: { flex: 1, borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.38)", paddingHorizontal: 10, paddingVertical: 12, justifyContent: "center" },
+  residentialPriceMatrixHeadCellLast: { width: "23%", paddingHorizontal: 10, paddingVertical: 12, justifyContent: "center" },
+  residentialPriceMatrixHeadText: { color: "#FFFFFF", fontFamily: "Century Gothic", fontWeight: "700", fontSize: 18, textAlign: "center" },
+  residentialPriceMatrixDataRow: { flexDirection: "row", minHeight: 64, borderBottomWidth: 1, borderBottomColor: "rgba(67, 134, 159, 0.12)" },
+  residentialPriceMatrixDataMain: { backgroundColor: "#F4FBFE" },
+  residentialPriceMatrixDataAlt: { backgroundColor: "#EAF8FD" },
+  residentialPriceMatrixCellSegment: { width: "20%", paddingHorizontal: 12, paddingVertical: 12, justifyContent: "center", alignItems: "flex-start" },
+  residentialPriceMatrixCellData: { flex: 1, paddingHorizontal: 10, paddingVertical: 11, justifyContent: "center", alignItems: "center" },
+  residentialPriceMatrixCellDataLast: { width: "23%", paddingHorizontal: 10, paddingVertical: 11, justifyContent: "center", alignItems: "center" },
+  residentialPriceMatrixSegment: { color: "#0E4463", fontFamily: "Century Gothic", fontWeight: "700", fontSize: 17, textAlign: "left", flexDirection: "row", alignItems: "center" },
+  residentialPriceMatrixSegmentIcon: { color: "#2B8BA8", fontSize: 20, fontWeight: "700" },
+  residentialPriceMatrixValuePill: {
+    minHeight: 38,
+    width: "90%",
+    backgroundColor: "#D7EEF7",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  residentialPriceMatrixValue: { color: "#0E4463", fontFamily: "Century Gothic", fontWeight: "700", fontSize: 16, textAlign: "center", includeFontPadding: false },
   miniMetricsRow: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   miniMetricCard: { width: "15.8%", minWidth: 150, flexGrow: 1, borderRadius: 16, borderWidth: 1, borderColor: "#E1EAF3", backgroundColor: AppColors.ui.background, padding: 14 },
   miniMetricLabel: { color: "#6B8297", fontSize: 12, fontFamily: "Century Gothic" },
@@ -1900,6 +3062,47 @@ const styles = StyleSheet.create({
   hotelBenchmarkGroupedCellEnd: { borderRightWidth: 1, borderRightColor: "#D1E4EE" },
   hotelBenchmarkAverageRow: { backgroundColor: "#8BC8D4" },
   hotelBenchmarkAverageCell: { fontWeight: "700", color: "#0E2D3E" },
+  residentialBenchmarkMainHeaderRow: { backgroundColor: "#4EAFC0", minHeight: 62 },
+  residentialBenchmarkHeaderCell: { color: AppColors.ui.background, fontWeight: "700", borderRightColor: "rgba(255,255,255,0.4)", textAlign: "center", textAlignVertical: "center", backgroundColor: "#4EAFC0", fontSize: 12 },
+  residentialBenchmarkGroupHeaderCell: { color: AppColors.ui.background, fontWeight: "700", borderRightColor: "rgba(255,255,255,0.4)", textAlign: "center", textAlignVertical: "center", backgroundColor: "#33859E", fontSize: 12 },
+  residentialBenchmarkGroupStartEdge: { borderLeftWidth: 1, borderLeftColor: "rgba(255,255,255,0.72)" },
+  residentialBenchmarkGroupEndEdge: { borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.72)" },
+  residentialBenchmarkSubHeaderRow: { backgroundColor: "#33859E", minHeight: 50 },
+  residentialBenchmarkSubHeaderCell: { color: AppColors.ui.background, fontWeight: "700", borderRightColor: "rgba(255,255,255,0.25)", textAlign: "center", textAlignVertical: "center", backgroundColor: "#33859E", fontSize: 11.5 },
+  residentialBenchmarkSubHeaderCellStart: { borderLeftWidth: 1, borderLeftColor: "rgba(255,255,255,0.7)" },
+  residentialBenchmarkSubHeaderCellEnd: { borderRightWidth: 1, borderRightColor: "rgba(255,255,255,0.7)" },
+  residentialBenchmarkCellBase: { minWidth: 0, paddingHorizontal: 8 },
+  residentialBenchmarkCell: { minWidth: 0, paddingHorizontal: 10 },
+  residentialBenchmarkGroupedCellStart: { borderLeftWidth: 1, borderLeftColor: "#D1E4EE" },
+  residentialBenchmarkGroupedCellEnd: { borderRightWidth: 1, borderRightColor: "#D1E4EE" },
+  residentialAverageRow: { backgroundColor: "#D6EEF2" },
+  residentialOverviewSection: { borderRadius: 18, borderWidth: 1, borderColor: "#D9EAF3", backgroundColor: "#FFFFFF", padding: 16, gap: 14 },
+  residentialSegmentsSection: { borderRadius: 18, borderWidth: 1, borderColor: "#D9EAF3", backgroundColor: AppColors.ui.background, padding: 16, gap: 14 },
+  residentialTablesSection: { gap: 12 },
+  sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
+  residentialActionPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, backgroundColor: AppColors.primary.main },
+  residentialActionPillText: { color: AppColors.ui.background, fontSize: 13, fontWeight: "700", fontFamily: "Century Gothic" },
+  residentialSegmentGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  residentialSegmentCard: { flex: 1, minWidth: 280, borderRadius: 16, borderWidth: 1, borderColor: "#E1EAF3", backgroundColor: "#FBFDFF", padding: 14, gap: 12 },
+  residentialSegmentHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  residentialSegmentImageWrap: { width: 90, height: 90, borderRadius: 0, overflow: "visible", backgroundColor: "transparent", borderWidth: 0 },
+  residentialSegmentImage: { width: "100%", height: "100%" },
+  residentialSegmentTitleWrap: { flex: 1 },
+  residentialSegmentTitle: { color: AppColors.primary.main, fontSize: 20, fontWeight: "700", fontFamily: "Century Gothic" },
+  residentialSegmentSubtitle: { marginTop: 4, color: "#6A8298", fontSize: 13, fontFamily: "Century Gothic" },
+  residentialSegmentKpiRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  residentialSegmentKpi: { flex: 1, minWidth: 118, borderRadius: 12, borderWidth: 1, borderColor: "#E1EAF3", backgroundColor: AppColors.ui.background, padding: 10 },
+  residentialSegmentKpiLabel: { color: "#6A8298", fontSize: 11, fontFamily: "Century Gothic" },
+  residentialSegmentKpiValue: { marginTop: 6, color: AppColors.primary.main, fontSize: 18, fontWeight: "700", fontFamily: "Century Gothic" },
+  residentialSegmentChartRow: { flexDirection: "row", flexWrap: "wrap", gap: 10, alignItems: "stretch" },
+  residentialSegmentChart: { flex: 1, minWidth: 220, height: 370, justifyContent: "space-between" },
+  residentialSegmentRanks: { borderRadius: 12, borderWidth: 1, borderColor: "#E1EAF3", backgroundColor: AppColors.ui.background, padding: 10, gap: 10 },
+  residentialSegmentRanksTitle: { color: AppColors.primary.main, fontSize: 13, fontWeight: "700", fontFamily: "Century Gothic" },
+  residentialSegmentRankRow: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  residentialSegmentRankItem: { minWidth: 92, flex: 1, alignItems: "center", gap: 6 },
+  residentialSegmentRankPill: { width: 26, height: 26, borderRadius: 13, backgroundColor: AppColors.primary.main, alignItems: "center", justifyContent: "center" },
+  residentialSegmentRankNumber: { color: AppColors.ui.background, fontSize: 12, fontWeight: "700", fontFamily: "Century Gothic" },
+  residentialSegmentRankLabel: { color: AppColors.ui.text, fontSize: 12, fontWeight: "700", fontFamily: "Century Gothic" },
   insightBanner: { flexDirection: "row", gap: 14, alignItems: "stretch" },
   insightBoard: { flex: 1, borderRadius: 18, borderWidth: 1, borderColor: "#D9EAF3", backgroundColor: "#F5FBFF", padding: 14, gap: 10 },
   insightBoardTitle: { fontSize: 16, fontWeight: "700", color: AppColors.primary.main, fontFamily: "Century Gothic" },
